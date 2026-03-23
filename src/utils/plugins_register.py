@@ -1,0 +1,32 @@
+import importlib
+from aiogram import Dispatcher
+from .logger_setup import setup_logger
+
+logger=setup_logger()
+PLUGIN_ORDER = [
+    "help",             #帮助       ***要放在最前，其中包含命令合法性检查
+                        #待开发插件
+    "AI"                #AI部分     ***一定要放在最后，否则其余需要进一步输入信息的指令均无法进行
+]
+
+def register_routers(dp:Dispatcher):
+    #from ..plugins.test import router
+    #dp.include_router(router)
+    logger.info(f"🔌 开始加载 {len(PLUGIN_ORDER)} 个插件...")
+    success_count=0
+    for index,plugin_name in enumerate(PLUGIN_ORDER,start=1):
+        try:
+            module=importlib.import_module(f"src.plugins.{plugin_name}")
+            if hasattr(module,"router"):
+                dp.include_router(module.router)
+                logger.info(f"✅ [{index}/{len(PLUGIN_ORDER)}] 插件 {plugin_name} 注册成功")
+                success_count+=1
+            else:
+                logger.error(f"❌ [{index}] 插件 '{plugin_name}' 缺少 'router' 属性 (请检查 __init__.py)")
+        except ModuleNotFoundError:
+            logger.error(f"❌ [{index}] 插件 '{plugin_name}' 未找到 (检查文件名/文件夹名)")
+        except Exception as e:
+            logger.error(f"❌ [{index}] 插件 '{plugin_name}' 加载异常: {e}",exc_info=True)
+    logger.info(f"🎉 插件加载完成 | 成功: {success_count} / 总计: {len(PLUGIN_ORDER)}")
+    if success_count==0:
+        logger.critical("⚠️ 警告：未加载任何插件！")

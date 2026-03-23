@@ -1,0 +1,13 @@
+[build-system]
+requires=["setuptools>=64.0","wheel"]
+build-backend="setuptools.build_meta"
+
+[project]
+name="TelegramBot"
+version="0.0.0"
+description="一个基于 aiogram 的机器人"
+requires-python=">=3.10,<4.0"
+packages=["src"]
+
+[tool.setuptools]
+package-dir={""="src"}

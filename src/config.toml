@@ -1,0 +1,6 @@
+[network]
+proxy="填代理地址和端口"
+
+[api_keys]
+siliconflow_key="填siliconflow的api"
+telegram_token="填telegram bot的token"
