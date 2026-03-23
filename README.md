@@ -80,6 +80,7 @@ python -m src.bot
 ```
 ## 📂 项目结构
 
+```text
 TelegramBot/
 ├── assets/                         # 静态资源
 │   └── googlechrome/               # Chrome 浏览器及驱动 (需自行放入)
@@ -119,6 +120,7 @@ TelegramBot/
 ├── requirements.txt                # 📦 依赖列表
 ├── LICENSE                         # 📜 开源许可证（MIT）
 └── README.md                       # 📘 说明文档
+```
 
 ## ⚠️ 温馨提示
 
