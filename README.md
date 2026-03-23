@@ -1,4 +1,4 @@
-# 🤖 Fool Telegram Bot
+# 🤖 Fool's Telegram Bot
 
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Aiogram Version](https://img.shields.io/badge/aiogram-3.x-green.svg)](https://docs.aiogram.dev/)
