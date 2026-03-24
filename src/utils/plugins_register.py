@@ -1,15 +1,16 @@
 import importlib
+import logging
+from typing import Dict,Any
 from aiogram import Dispatcher
-from .logger_setup import setup_logger
 
-logger=setup_logger()
+logger=logging.getLogger("Bot.Setup.Plugins")
 PLUGIN_ORDER = [
     "help",             #帮助       ***要放在最前，其中包含命令合法性检查
-                        #待开发插件
+    "welcome",          #没什么
     "AI"                #AI部分     ***一定要放在最后，否则其余需要进一步输入信息的指令均无法进行
 ]
 
-def register_routers(dp:Dispatcher):
+def register_routers(dp:Dispatcher,CONFIG:Dict[str,Any]):
     #from ..plugins.test import router
     #dp.include_router(router)
     logger.info(f"🔌 开始加载 {len(PLUGIN_ORDER)} 个插件...")

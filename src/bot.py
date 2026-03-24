@@ -1,35 +1,37 @@
-import time
 import asyncio
 from aiogram import Bot,Dispatcher
-from aiogram.filters import Command
-from aiogram.types import Message
 from aiogram.client.session.aiohttp import AiohttpSession
 
-from .utils import setup_logger,LoggingMiddleware,register_routers
-from .utils.config_loader import proxy,token
+from .utils import setup_logger,register_routers,LoggingMiddleware
 
-dp=Dispatcher()
+logger=setup_logger()
 
 async def main():
-    logger=setup_logger()
+    #初始化日志
+    logger.info("🤖 TelegramBot 正在启动...")
+
+    #导入配置
+    from .utils import CONFIG
+
+    #初始化 Bot
+    session=AiohttpSession(proxy=CONFIG['network']['proxy'])
+    bot=Bot(token=CONFIG['api_keys']['telegram_token'],session=session)
+
+    #注册插件和中间件
+    dp=Dispatcher()
     dp.update.outer_middleware(LoggingMiddleware())
+    register_routers(dp,CONFIG)
 
-    @dp.message(Command("start"))
-    async def command_start_handler(message:Message) -> None:
-        await message.answer(
-            "你好，我是基于aiogram开发的机器人Fool\n"
-            "你可以输入\"/help\"获取功能列表，现在与我开始对话吧~"
-        )
-
-    @dp.message(Command('time'))
-    async def now_time(message:Message):
-        await message.answer(time.strftime("%Y-%m-%d %H:%M:%S",time.localtime()))
-    
-    register_routers(dp)
-    session=AiohttpSession(proxy=proxy)
-    bot=Bot(token=token,session=session)
+    #⚪️神启动！
     logger.info("🚀 机器人启动成功")
-    await dp.start_polling(bot)
+    try:
+        logger.info("🚀 开始轮询更新...")
+        await dp.start_polling(bot)
+    except KeyboardInterrupt:
+        logger.info("👋 收到中断信号，正在关闭...")
+    finally:
+        await bot.session.close()
+        logger.info("💤 机器人已关闭")
 
 if __name__=="__main__":
     asyncio.run(main())

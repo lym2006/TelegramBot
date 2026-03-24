@@ -9,13 +9,13 @@ from markdown import markdown
 from selenium.webdriver.chrome.webdriver import WebDriver as ChromeDriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-
 from aiogram.types import Message
 
-from ...utils.config_loader import key
+from ...utils import CONFIG
 
 cupa=Path.cwd()/'src/plugins/AI/record'
 tmp=Path.cwd()/'assets'
+key=CONFIG['api_keys']['siliconflow_key']
 
 rc=lambda role,content:{"role":role,"content":content}
 per='你是智能机器人助手Fool'
@@ -200,8 +200,8 @@ def mark(nm,path):
     driver=ChromeDriver(options=options,service=service)
     try:
         driver.set_window_position(0,0)
-        INITIAL_WIDTH=5000 
-        INITIAL_HEIGHT=2000
+        INITIAL_WIDTH=1920
+        INITIAL_HEIGHT=1080
         driver.set_window_size(INITIAL_WIDTH,INITIAL_HEIGHT)
         driver.get(f'file:///{path}')
         driver.implicitly_wait(2)
@@ -217,6 +217,7 @@ def mark(nm,path):
     finally:
         driver.quit()
     img=Image.open(pa).convert('RGB')
+    img.show()
     width,height=img.size
     ORANGE=(255,180,0)
     BORDER_WIDTH=3

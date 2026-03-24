@@ -1,6 +1,8 @@
 import time
 import json
+import logging
 import asyncio
+from datetime import datetime
 
 from aiogram import Bot,Router
 from aiogram.types import Message,FSInputFile,User
@@ -18,6 +20,7 @@ per = file.read()
 file.close()'''     #人设
 user_session={}     #用户状态
 router=Router()
+logger=logging.getLogger("Bot.Plugins.AI")
 session_guard=ensure_user_session(
     user_session,
     {
@@ -25,6 +28,7 @@ session_guard=ensure_user_session(
         'md':False
     }
 )
+
 #############################################################################################################################################################
 
 @router.message(Command('off'))#关闭对话
@@ -82,7 +86,7 @@ async def clear_history(message:Message):
 
 #############################################################################################################################################################
 
-'''@router.message(Command('balance'))#查询余额
+@router.message(Command('balance'))#查询余额
 async def check_balance(message:Message):
     try:
         resp=await client.get("/user/info")
@@ -95,7 +99,8 @@ async def check_balance(message:Message):
         ]
         await message.answer("\n".join(report_lines))
     except Exception as e:
-        await message.answer(f"查询失败\n{str(e)}")'''
+        logger.error(f"查询失败\n{str(e)}")
+        await message.answer(f"查询失败")
 
 #############################################################################################################################################################
 
@@ -183,7 +188,7 @@ async def AIchat(message:Message,bot:Bot):
     sent_msg=await message.answer("🤔 正在思考中")
     msg_id=sent_msg.message_id
     payload={
-        "model":"Pro/deepseek-ai/DeepSeek-R1",#可改为需要的模型，具体名称见siliconflow.cn
+        "model":"Pro/deepseek-ai/DeepSeek-R1",
         "messages":makedata(thisinput=city,user=user),
         "stream":True,
         "temperature":0.7,
@@ -218,14 +223,15 @@ async def AIchat(message:Message,bot:Bot):
                                     elif "rate limit" in str(e):
                                         await asyncio.sleep(1)
                                     else:
-                                        print(f"编辑消息失败: {e}")
+                                        logger.error(f"编辑消息失败: {e}")
                     except json.JSONDecodeError:
                         continue
                     except Exception as e:
-                        print(f"解析数据块出错: {e}\nchunk: {chunk}")
+                        logger.error(f"解析数据块出错: {e}\nchunk: {chunk}")
                         continue
     except Exception as e:
-        await message.answer(f"❌ 流式请求异常: {str(e)}")
+        logger.error(f"❌ 流式请求异常: {e}")
+        await message.answer(f"❌ 流式请求异常")
     final_think=user_session[user]['current_think']
     if final_think:
         preview_think=final_think[-2000:] if len(final_think)>2000 else final_think
@@ -234,7 +240,7 @@ async def AIchat(message:Message,bot:Bot):
             print(f"🚀 正在强制推送最终思考内容...")
             await bot.edit_message_text(final_display_text,chat_id=message.chat.id,message_id=msg_id)
         except Exception as e:
-            print(f"最终推送失败: {e}")
+            logger.error(f"最终推送失败: {e}")
     wrt=''
     msg=user_session[user]['current_msg']
     match message.chat.type:

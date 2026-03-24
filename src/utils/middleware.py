@@ -1,37 +1,60 @@
+import logging
 from typing import Dict,Callable,Any,Awaitable
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message,TelegramObject,Update
+from aiogram.types import Message,Update
 from aiogram.enums import ChatType
-
-from .logger_setup import setup_logger
 
 class LoggingMiddleware(BaseMiddleware):#用于记录日志
     def __init__(self):
-        self.logger=setup_logger()
+        super().__init__()
+        self.logger=logging.getLogger("Bot.Middlewares")
     async def __call__(
         self,
-        handler: Callable[[TelegramObject,Dict[str,Any]],Awaitable[Any]],
-        event:TelegramObject,
-        data:Dict[str, Any]
+        handler:Callable[[Update,Dict[str,Any]],Awaitable[Any]],
+        event:Update,
+        data:Dict[str,Any]
     ):
-        log_msg=''
-        if isinstance(event,Update):
-            message=event.message if hasattr(event,'message') else None
-            if isinstance(message,Message):
-                content_type=message.content_type
-                user_info=f"{message.chat.id} ({message.chat.full_name})"
-                if message.chat.type==ChatType.GROUP:
-                    group_info=user_info
-                    user=message.from_user
-                    assert user,'用户为空'
-                    user_info=f"{user.id} ({user.full_name})"
-                    log_msg+=f"群组 {group_info} | "
-                log_msg+=(
-                    f"用户 {user_info} 发送文本: {message.text}"
-                    if content_type=="text"
-                    else f"用户 {user_info} 发送 {content_type} 类型消息"
-                )
-        if log_msg:
+        try:
+            if not event.message:
+                return await handler(event,data)
+            message:Message=event.message
+            chat=message.chat
+            user=message.from_user
+            sender_chat=message.sender_chat
+            content_type=message.content_type
+            chat_name=chat.title if chat.title else (chat.first_name or "未知聊天")
+            chat_type_map={
+                ChatType.PRIVATE:"私聊",
+                ChatType.GROUP:"群组",
+                ChatType.SUPERGROUP:"超级群",
+                ChatType.CHANNEL:"频道"
+            }
+            chat_label=chat_type_map.get(ChatType(chat.type),"未知")
+            chat_info=f"{chat_label}[{chat.id}]<{chat_name}>"
+            if user:
+                user_name=user.full_name if user.full_name else (user.first_name or "无名氏")
+                sender_info=f"用户{user.id}<{user_name}>"
+            elif sender_chat:
+                sender_name=sender_chat.title or "未知来源"
+                sender_info=f"匿名/频道[{sender_chat.id}]<{sender_name}>"
+            else:
+                sender_info="系统/未知"
+            content_preview=""
+            if content_type=="text":
+                text=message.text or ""
+                reply_mark="[回复]" if message.reply_to_message else ""
+                text_preview=(text[:60]+"...") if len(text)>60 else text
+                content_preview=f"{reply_mark}[长度：{len(text)}]文本：{text_preview}"
+            else:
+                file_detail=""
+                if content_type=="document" and message.document:
+                    file_detail=f"({message.document.file_name})"
+                elif content_type=="photo":
+                    file_detail=f"({len(message.photo) if message.photo else 0}张)"
+                content_preview=f"{content_type}消息：{file_detail}".strip()
+            log_msg=f"{chat_info} | {sender_info} 发送 {content_preview}"
             self.logger.info(log_msg)
-        return await handler(event, data)
+        except Exception as e:
+            self.logger.error(f"LoggingMiddleware 执行出错: {e}",exc_info=True)
+        return await handler(event,data)

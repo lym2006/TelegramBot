@@ -40,6 +40,7 @@ secrets.json
 .swo
 
 # --- 日志文件 (可选，如果日志太大建议忽略) ---
+/logs
 logs
 .log
 
