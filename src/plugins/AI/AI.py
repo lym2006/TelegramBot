@@ -97,7 +97,7 @@ async def check_balance(message:Message):
         resp=await client.get("/user/info")
         total=resp.json()['data']['totalBalance']
         charge=resp.json()['data']['chargeBalance']
-        free=total-charge
+        free=float(total)-float(charge)
         report_lines=[
             "💰账户余额",
             f"总额：{total}",
