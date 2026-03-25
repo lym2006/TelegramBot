@@ -1,6 +1,6 @@
+import re
 import time
 import json
-import logging
 import asyncio
 from datetime import datetime
 
@@ -12,15 +12,23 @@ from aiogram.fsm.context import FSMContext
 from aiogram.enums import ParseMode,ChatType,ContentType
 from aiogram.exceptions import TelegramBadRequest
 
-from .func import rc,ini,client,cupa
-from .func import mark,generate_html,send_long_message,ensure_user_session,get_black_list,save_black_list
+from .func import (
+    rc,ini,cupa,logger,
+    mark,
+    get_name,
+    client,
+    generate_html,
+    send_long_message,
+    ensure_user_session,
+    get_black_list,
+    save_black_list
+)
 
 '''file = open(cupa/'personality.txt','r',encoding = 'utf-8')
 per = file.read()
 file.close()'''     #人设
 user_session={}     #用户状态
 router=Router()
-logger=logging.getLogger("Bot.Plugins.AI")
 session_guard=ensure_user_session(
     user_session,
     {
@@ -33,7 +41,7 @@ session_guard=ensure_user_session(
 
 @router.message(Command('off'))#关闭对话
 async def turn_off(message:Message):
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     black_list=get_black_list()
     if user not in black_list:
         black_list.append(user)
@@ -44,7 +52,7 @@ async def turn_off(message:Message):
 
 @router.message(Command('on'))#开启对话
 async def turn_on(message:Message):
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     black_list=get_black_list()
     if user in black_list:
         black_list.remove(user)
@@ -58,7 +66,7 @@ async def turn_on(message:Message):
 @router.message(Command('md'))#发送markdown
 @session_guard
 async def send_markdown(message:Message):
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     if user_session[user]['md']:
         await message.answer_photo(FSInputFile(cupa/f'{user}.png'))
     else:
@@ -69,7 +77,7 @@ async def send_markdown(message:Message):
 @router.message(Command('history'))#对话历史
 @session_guard
 async def show_history(message:Message):
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     messageList=user_session[user]['message'][-30:]#只显示最近的30条，有需求查本地记录
     print(messageList)
     await message.answer(str([{v['role']: v['content']} for v in messageList]))
@@ -77,12 +85,9 @@ async def show_history(message:Message):
 @router.message(Command('clear'))#清空历史
 @session_guard
 async def clear_history(message:Message):
-    user=str(message.chat.id)
-    if user_session[user]['message']==ini:
-        await message.answer("没有对话")
-    else:
-        user_session[user]['message']=ini.copy()
-        await message.answer("记忆清除成功")
+    user=get_name(message.chat.id)
+    user_session[user]['message']=ini.copy()
+    await message.answer("记忆清除成功")
 
 #############################################################################################################################################################
 
@@ -90,10 +95,14 @@ async def clear_history(message:Message):
 async def check_balance(message:Message):
     try:
         resp=await client.get("/user/info")
+        total=resp.json()['data']['totalBalance']
+        charge=resp.json()['data']['chargeBalance']
+        free=total-charge
         report_lines=[
             "💰账户余额",
-            f"总额：{resp.json()['data']['totalBalance']}",
-            f"充值余额：{resp.json()['data']['chargeBalance']}",
+            f"总额：{total}",
+            f"充值余额：{charge}",
+            f"赠送余额：{free}",
             f"状态：{resp.json()['data']['status']}",
             f"更新时间：{datetime.now().strftime('%m-%d %H:%M')}"
         ]
@@ -130,7 +139,7 @@ async def changesetting(message:Message,state:FSMContext):
     tmp=await state.get_data()
     name=tmp['name']
     identity=message.text
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     user_session[user]['message'].append(rc("system",f"更改你的身份，你现在是{identity}，名字叫{name}"))
     assert message.from_user,'用户为空'
     await message.answer(f"{makemention(message.from_user)}，你的机器人「{name}」已准备好，可以开始对话。",parse_mode=ParseMode.MARKDOWN_V2)
@@ -152,7 +161,7 @@ async def post_to_system(message:Message,state:FSMContext):
     if not message.text:
         await message.answer("请重新输入文本")
         return
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     msg=message.text
     user_session[user]['message'].append(rc('system',msg))
     await message.answer("成功输入")
@@ -171,13 +180,13 @@ class ChatFilter(Filter):
         if message.chat.type==ChatType.PRIVATE:
             is_command=message.text.startswith('/')
             return not is_command
-        is_mention='@fool' in message.text.lower()
-        return is_mention
+        else:
+            return any(keyword in message.text.lower() for keyword in ["fool","yimingleibot"])
 
 @router.message(ChatFilter())#AI对话
 @session_guard
 async def AIchat(message:Message,bot:Bot):
-    user=str(message.chat.id)
+    user=get_name(message.chat.id)
     user_session[user]['md']=True
     city=message.text
     black_list=get_black_list()
@@ -196,7 +205,8 @@ async def AIchat(message:Message,bot:Bot):
     try:
         async with client.stream("POST","/chat/completions",json=payload) as response:
             if (code:=response.status_code)!=200:
-                await message.answer('错误码'+str(code))
+                await message.answer("response错误")
+                logger.error("错误码"+str(code))
                 return
             user_session[user]['current_msg']=""
             user_session[user]['last_edit_time']=0
@@ -211,27 +221,37 @@ async def AIchat(message:Message,bot:Bot):
                             user_session[user]['current_think']+=content if not content.endswith('\n') else content[:-1]
                             current_think=user_session[user]['current_think']
                             current_time=time.time()
-                            if current_time-user_session[user]['last_edit_time']>0.8:
+                            if current_time-user_session[user]['last_edit_time']>1.5:
                                 preview_think=current_think[-2000:] if len(current_think)>2000 else current_think
                                 edit_text=f"🤔 正在思考中\n{preview_think}"
                                 try:
                                     await bot.edit_message_text(edit_text,chat_id=chat_id,message_id=msg_id)
                                     user_session[user]['last_edit_time']=current_time
                                 except TelegramBadRequest as e:
-                                    if "message is not modified" in str(e):
+                                    error_str=str(e).lower()
+                                    if "message is not modified" in error_str:
                                         pass
-                                    elif "rate limit" in str(e):
-                                        await asyncio.sleep(1)
+                                    elif (w in error_str for w in ["flood control exceeded","too many requests"]):
+                                        wait_time=5
+                                        match=re.search(r"retry after (\d+)",str(e))
+                                        if match:
+                                            wait_time=int(match.group(1))+1
+                                            message.answer(f"⚠️ 触发频控，暂停编辑 {wait_time} 秒...")
+                                            logger.warning(f"⚠️ 触发频控，暂停编辑 {wait_time} 秒...")
+                                        await asyncio.sleep(wait_time)
+                                        user_session[user]['last_edit_time']=time.time()
                                     else:
-                                        logger.error(f"编辑消息失败: {e}")
+                                        message.answer("编辑错误")
+                                        logger.error(f"编辑消息失败（非频控）: {e}")
+                                        break
                     except json.JSONDecodeError:
                         continue
                     except Exception as e:
                         logger.error(f"解析数据块出错: {e}\nchunk: {chunk}")
                         continue
     except Exception as e:
+        await message.answer(f"流式请求错误")
         logger.error(f"❌ 流式请求异常: {e}")
-        await message.answer(f"❌ 流式请求异常")
     final_think=user_session[user]['current_think']
     if final_think:
         preview_think=final_think[-2000:] if len(final_think)>2000 else final_think
@@ -240,6 +260,7 @@ async def AIchat(message:Message,bot:Bot):
             print(f"🚀 正在强制推送最终思考内容...")
             await bot.edit_message_text(final_display_text,chat_id=message.chat.id,message_id=msg_id)
         except Exception as e:
+            await message.answer("推送错误")
             logger.error(f"最终推送失败: {e}")
     wrt=''
     msg=user_session[user]['current_msg']
@@ -253,7 +274,7 @@ async def AIchat(message:Message,bot:Bot):
     open(cupa/f'{user}.txt','a',encoding='utf8').write(wrt)
     user_session[user]['message'].extend([rc("user",city),rc("assistant",msg)])
     print(msg)
-    final_html=generate_html(msg,user)
+    final_html=generate_html(msg)
     with open(cupa/f'{user}.html','w',encoding='utf-8') as a:
         a.write(final_html)
     mark(user,str(cupa/f'{user}.html'))

@@ -3,6 +3,7 @@ import functools
 import copy
 import asyncio
 import httpx
+import logging
 from pathlib import Path
 from PIL import Image
 from markdown import markdown
@@ -16,6 +17,7 @@ from ...utils import CONFIG
 cupa=Path.cwd()/'src/plugins/AI/record'
 tmp=Path.cwd()/'assets'
 key=CONFIG['api_keys']['siliconflow_key']
+logger=logging.getLogger("Bot.Plugins.AI")
 
 rc=lambda role,content:{"role":role,"content":content}
 per='你是智能机器人助手Fool'
@@ -26,6 +28,7 @@ ini=[
     rc("system","在适当的情境下，请适量使用emoji")
 ]
 
+#def get_client(key:str):
 client=httpx.AsyncClient(
     base_url="https://api.siliconflow.cn/v1",
     headers={
@@ -34,20 +37,9 @@ client=httpx.AsyncClient(
     },
     timeout=90.0
 )
+    #return client
 
-def ensure_user_session(session:dict,default:dict):
-    def ensure_user_session(func):
-        @functools.wraps(func)
-        async def wrapper(message:Message,*args,**kwargs):
-            user=str(message.chat.id)
-            if user not in session:
-                session[user]=copy.deepcopy(default)
-                print(f"🆕 [Decorator] 为用户 {user} 初始化会话")
-            return await func(message,*args,**kwargs)
-        return wrapper
-    return ensure_user_session
-
-head = '''<!DOCTYPE html>
+head='''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -63,59 +55,106 @@ head = '''<!DOCTYPE html>
             src: url('font.ttf') format('truetype');
         }
         * {
-            margin: 0;
-            padding: 0;
-            font-family: 'SegUIEmoji', 'MyMainFont', 'Segoe UI Emoji', sans-serif !important;
-            font-size: 16px;
-            white-space: pre-wrap;
-            line-height: 1.5em;
             box-sizing: border-box;
-            color: #333;
         }
         body {
-            display: inline-block;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: fit-content;
             min-width: 600px;
+            max-width: 1200px; 
             padding: 5px 5px 85px 5px;
             border: 3px solid #FFB400; 
             background-color: #ffffff; 
-            position: relative;
-            margin: 0 auto;
+            font-family: 'SegUIEmoji', 'MyMainFont', 'Segoe UI Emoji', sans-serif !important;
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #333;
+            margin: 0;
+
+        }
+        p, h1, h2, h3, h4, h5, h6, 
+        ul, ol, dl, 
+        blockquote, pre, figure, figcaption, 
+        table, hr, div {
+            margin-top: 0.8em;
+            margin-bottom: 0.8em;
+        }
+        li {
+            margin-top: 0.2em;
+            margin-bottom: 0.2em;
+        }
+        td, th {
+            margin: 0;
+            padding: 8px;
+        }
+        body > :first-child {
+            margin-top: 0 !important;
+        }
+        body > :last-child:not(.color-lump):not(script):not(style) {
+            margin-bottom: 0 !important;
         }
         pre[class*="language-"] {
             background-color: #2d2d2d !important; 
             border-radius: 8px;
-            margin: 15px 0;
+            margin-top: 1em !important;
+            margin-bottom: 1em !important;
             padding: 15px;
             border: 1px solid #444;
             color: #f8f8f2 !important;
-            white-space: pre;
-            overflow-x: auto; /* 允许横向滚动 */
-            width: 100%;
-            max-width: 100%;
-            text-shadow: none; /* 去除某些主题的阴影 */
-        }
-        code[class*="language-"], pre[class*="language-"] {
-            font-family: 'Consolas', 'Monaco', 'Courier New', 'SegUIEmoji', 'MyMainFont', monospace !important;
+            white-space: pre-wrap !important;
+            word-break: break-all !important;
+            overflow-x: hidden !important; 
+            width: 100%; 
+            max-width: 100%; 
+            display: block;
+            line-height: 1.3 !important;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
             font-size: 14px;
-            text-shadow: none !important;
         }
-        p code, li code, td code {
+        p code, li code, td code, h1 code, h2 code, h3 code {
             background-color: #f0f0f0 !important;
             color: #e83e8c !important;
             padding: 2px 6px;
             border-radius: 4px;
             font-family: 'Consolas', 'SegUIEmoji', 'MyMainFont', monospace !important;
             font-size: 0.9em;
-            white-space: nowrap;
+            white-space: nowrap !important;
+            margin: 0 !important;
+            vertical-align: middle;
         }
         blockquote {
             background-color: #f8f9fa;
             border-left: 4px solid #e338e6;
-            margin: 15px 0;
+            margin: 1em 0 !important;
             padding: 10px 15px;
             color: #555;
             border-radius: 0 4px 4px 0;
+            white-space: pre-wrap; 
+        }
+        pre code {
+            margin: 0 !important;
+            padding: 0;
+            background: none;
+            color: inherit;
+            font-size: inherit;
+            white-space: inherit;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
         }
         br {
             display: none; 
@@ -128,14 +167,12 @@ head = '''<!DOCTYPE html>
             left: 0;
             bottom: 0;
             border-radius: 0;
-            z-index: 9999;
+            z-index: 100;
             margin: 0;
-            transform: none;
         }
     </style>
 </head>
-<body>
-'''
+<body>'''
 
 tail='''
 <div class="color-lump"></div>
@@ -165,7 +202,22 @@ PRISM_COMPONENTS={
 
 CDN_BASE="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/"
 
-def generate_html(msg:str,user:str):
+def get_name(chat_id:int):
+    return f"g_{abs(chat_id)}" if chat_id<0 else f"u_{chat_id}"
+
+def ensure_user_session(session:dict,default:dict):
+    def ensure_user_session(func):
+        @functools.wraps(func)
+        async def wrapper(message:Message,*args,**kwargs):
+            user=user=get_name(message.chat.id)
+            if user not in session:
+                session[user]=copy.deepcopy(default)
+                print(f"🆕 [Decorator] 已为 {user} 初始化会话")
+            return await func(message,*args,**kwargs)
+        return wrapper
+    return ensure_user_session
+
+def generate_html(msg:str):
     html_body=markdown(
             msg,
             extensions=['fenced_code','tables','nl2br','codehilite'],
@@ -192,43 +244,38 @@ def mark(nm,path):
     pa=str(cupa/f"{nm}.png")
     options=Options()
     options.add_argument("--headless")
-    options.add_argument('--remote-debugging-port=9222')
+    options.add_argument('--remote-debugging-port=9223')
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--allow-insecure-localhost')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
     options.binary_location=str(tmp/'googlechrome/chrome.exe')
     service=Service(executable_path=str(tmp/'googlechrome/chromedriver.exe'))
     driver=ChromeDriver(options=options,service=service)
     try:
         driver.set_window_position(0,0)
-        INITIAL_WIDTH=1920
-        INITIAL_HEIGHT=1080
-        driver.set_window_size(INITIAL_WIDTH,INITIAL_HEIGHT)
+        driver.set_window_size(1280,8000)
         driver.get(f'file:///{path}')
         driver.implicitly_wait(2)
         total_height=driver.execute_script("return document.body.scrollHeight;")
-        total_width=driver.execute_script("return document.body.scrollWidth;")
-        final_height=total_height+50
-        final_width=total_width+50
-        driver.set_window_size(final_width,final_height)
+        final_height=min(int(total_height)+50,8000)
+        driver.set_window_size(1280,final_height)
         driver.implicitly_wait(2)
         driver.save_screenshot(pa)
     except Exception as e:
-        print(f"❌ 截图过程出错: {e}")
+        logger.error(f"❌ 截图过程出错: {e}")
     finally:
         driver.quit()
     img=Image.open(pa).convert('RGB')
-    img.show()
     width,height=img.size
-    ORANGE=(255,180,0)
-    BORDER_WIDTH=3
     def row_has_orange(y,x_start,x_end):
         for x in range(x_start,x_end+1):
-            if 0<=x<width and img.getpixel((x,y))==ORANGE:
+            if 0<=x<width and img.getpixel((x,y))==(255,180,0):
                 return True
         return False
     def col_has_orange(x,y_start,y_end):
         for y in range(y_start,y_end+1):
-            if 0<=y<height and img.getpixel((x, y))==ORANGE:
+            if 0<=y<height and img.getpixel((x, y))==(255,180,0):
                 return True
         return False
     top=0
@@ -252,31 +299,30 @@ def mark(nm,path):
             right=x
             break
     if top<bottom and left<right:
-        inner_left=left+BORDER_WIDTH
-        inner_right=right-BORDER_WIDTH
-        inner_top=top+BORDER_WIDTH
-        inner_bottom=bottom-BORDER_WIDTH-80
+        inner_left=left+3
+        inner_right=right-3
+        inner_top=top+3
+        inner_bottom=bottom-3-80
         if inner_top<inner_bottom and inner_left<inner_right:
             cropped_img=img.crop((inner_left,inner_top,inner_right,inner_bottom))
             cropped_img.save(pa)
-            print(f"✅ 成功裁剪：[{inner_left}, {inner_top}, {inner_right}, {inner_bottom}]")
+            logger.info(f"✅ 成功裁剪：[{inner_left}, {inner_top}, {inner_right}, {inner_bottom}]")
         else:
-            print("⚠️ 警告：扣除边框后区域无效，可能图片过小，保存原图。")
+            logger.warning("⚠️ 警告：扣除边框后区域无效，可能图片过小，保存原图。")
             img.save(pa)
     else:
-        print("⚠️ 警告：未检测到橙色边框，保存原图。")
+        logger.warning("⚠️ 警告：未检测到橙色边框，保存原图。")
         img.save(pa)
 
 async def send_long_message(message:Message,text):
-    MAX_LEN=4000
     total_len=len(text)
-    for i in range(0,total_len,MAX_LEN):
-        chunk=text[i:i+MAX_LEN]
+    for i in range(0,total_len,4000):
+        chunk=text[i:i+4000]
         try:
             await message.reply(chunk)
         except Exception as e:
-            print(f"发送失败: {e}")
-        if total_len>MAX_LEN*5:
+            logger.error(f"发送失败: {e}")
+        if total_len>4000*5:
             await asyncio.sleep(1)
 
 def get_black_list():
