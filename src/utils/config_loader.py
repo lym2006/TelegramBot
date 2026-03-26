@@ -1,17 +1,9 @@
 import sys
+import tomllib
 import logging
 from pathlib import Path
 
 logger=logging.getLogger("Bot.Setup.Config")
-
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # type: ignore # Python < 3.11
-    except ImportError:
-        logger.error("❌ 错误: 缺少 TOML 库。请运行: pip install tomli")
-        sys.exit(1)
 
 def get_project_root():
     return Path(__file__).resolve().parent.parent

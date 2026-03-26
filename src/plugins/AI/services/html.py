@@ -1,43 +1,14 @@
 import re
-import functools
-import copy
-import asyncio
-import httpx
-import logging
 from pathlib import Path
 from PIL import Image
 from markdown import markdown
 from selenium.webdriver.chrome.webdriver import WebDriver as ChromeDriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from aiogram.types import Message
 
-from ...utils import CONFIG
+from ..glo import cupa,logger
 
-cupa=Path.cwd()/'src/plugins/AI/record'
 tmp=Path.cwd()/'assets'
-key=CONFIG['api_keys']['siliconflow_key']
-logger=logging.getLogger("Bot.Plugins.AI")
-
-rc=lambda role,content:{"role":role,"content":content}
-per='你是智能机器人助手Fool'
-ini=[
-    rc("system",per),
-    rc("system","你的开发者是「L the Fool」"),
-    rc("system","重要：接下来的对话若无必要请不要使用除简体中文和英语之外的任何语言，请使用markdown格式"),
-    rc("system","在适当的情境下，请适量使用emoji")
-]
-
-#def get_client(key:str):
-client=httpx.AsyncClient(
-    base_url="https://api.siliconflow.cn/v1",
-    headers={
-        "Authorization": f"Bearer {key}",
-        "Content-Type": "application/json"
-    },
-    timeout=90.0
-)
-    #return client
 
 head='''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -202,21 +173,6 @@ PRISM_COMPONENTS={
 
 CDN_BASE="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/"
 
-def get_name(chat_id:int):
-    return f"g_{abs(chat_id)}" if chat_id<0 else f"u_{chat_id}"
-
-def ensure_user_session(session:dict,default:dict):
-    def ensure_user_session(func):
-        @functools.wraps(func)
-        async def wrapper(message:Message,*args,**kwargs):
-            user=user=get_name(message.chat.id)
-            if user not in session:
-                session[user]=copy.deepcopy(default)
-                print(f"🆕 [Decorator] 已为 {user} 初始化会话")
-            return await func(message,*args,**kwargs)
-        return wrapper
-    return ensure_user_session
-
 def generate_html(msg:str):
     html_body=markdown(
             msg,
@@ -313,25 +269,3 @@ def mark(nm,path):
     else:
         logger.warning("⚠️ 警告：未检测到橙色边框，保存原图。")
         img.save(pa)
-
-async def send_long_message(message:Message,text):
-    total_len=len(text)
-    for i in range(0,total_len,4000):
-        chunk=text[i:i+4000]
-        try:
-            await message.reply(chunk)
-        except Exception as e:
-            logger.error(f"发送失败: {e}")
-        if total_len>4000*5:
-            await asyncio.sleep(1)
-
-def get_black_list():
-    path=cupa/'black.txt'
-    if not path.exists():
-        return []
-    with open(path,'r',encoding='utf-8') as a:
-        return [line.strip() for line in a if line.strip()]
-    
-def save_black_list(black_list:list):
-    with open(cupa/'black.txt','w',encoding='utf-8') as a:
-        a.write('\n'.join(black_list))

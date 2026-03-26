@@ -77,49 +77,6 @@ Token 可以通过与 [BotFather](https://t.me/BotFather) 对话获取。
 ```bash
 python -m src.bot
 ```
-## 📂 项目结构
-
-```text
-TelegramBot/
-├── assets/                         # 静态资源
-│   └── googlechrome/               # Chrome 浏览器及驱动 (需自行放入)
-│       └── ...                     # 解压googlechrome.rar
-│
-├── src/                            # 源代码目录
-│   ├── utils/                      # 🛠️ 工具类
-│   │   ├── __init__.py
-│   │   ├── config_loader.py        # 配置加载 (读取 config.toml)
-│   │   ├── logger_setup.py         # 日志配置
-│   │   ├── middleware.py           # 中间件
-│   │   └── plugins_register.py     # 插件注册
-│   │
-│   ├── plugins/                    # 🔌 功能插件
-│   │   ├── AI/                     # AI 相关功能
-│   │   │   ├── record/             # 记录
-│   │   │   │   ├── black.txt       # 黑名单
-│   │   │   │   ├── personality.txt # 人设
-│   │   │   │   ├── font.ttf        # 自定义字体
-│   │   │   │   └── seguiemj.ttf    # emoji字体
-│   │   │   │
-│   │   │   ├── AI.py
-│   │   │   ├── func.py
-│   │   │   └── __init__.py
-│   │
-│   ├── help/                       # ❓ 帮助模块
-│   │   ├── __init__.py
-│   │   ├── help.py
-│   │   └── font.ttf                # 自定义字体
-│   │
-│   ├── __init__.py
-│   ├── bot.py                      # 🚀 程序入口
-│   └── config.toml                 # ⚙️ 主配置文件
-│
-├── .gitignore                      # 🚫 Git 忽略规则
-├── pyproject.toml                  # 📦 项目构建与元数据配置
-├── requirements.txt                # 📦 依赖列表
-├── LICENSE                         # 📜 开源许可证（MIT）
-└── README.md                       # 📘 说明文档
-```
 
 ## ⚠️ 温馨提示
 

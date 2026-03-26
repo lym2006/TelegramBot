@@ -11,13 +11,13 @@ router=Router()
 cupa=Path.cwd()/'src/plugins/help'
 notice={#命令和空格共占10位，其中中文占2位
     0:"Fool的功能列表\n注：只有少量命令后可带参数",
-    "start":"没啥用",
-    "time":"输出系统时间",
+    #"start":"没啥用",
+    #"time":"输出系统时间",
     "help":"查看帮助文档，命令后接-h可以单独查看该命令帮助",
     1:"\nAI部分\n独立会话和思考过程",
     "on":"开启AI对话",
     "off":"关闭AI对话",
-    #"md":"以markdown格式输出上一次回复内容（图片）",
+    "md":"以markdown格式输出上一次回复内容（图片）",
     "change":"更改AI人设",
     "history":"显示历史记录（不包括思考过程）",
     "clear":"清空记忆",

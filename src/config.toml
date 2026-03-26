@@ -1,6 +1,5 @@
 [network]
-proxy="填代理地址和端口"
+proxy="http://127.0.0.1:7897"
 
 [api_keys]
-siliconflow_key="填siliconflow的api"
-telegram_token="填telegram bot的token"
+telegram_token="7558512722:AAGhKIm9jA97jqjN2fQLuDEipx6TMOApIfU"
