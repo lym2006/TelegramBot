@@ -47,15 +47,12 @@ class ChatClient(BaseClient):
         }
         async with self.stream("POST","/chat/completions",json=payload) as response:
             if (code:=response.status_code)!=200:
-                print("error")
                 raise Exception(f"错误码{code}")
             async for chunk in response.aiter_lines():
-                print(chunk)
                 if chunk.startswith("data: "):
                     try:
                         data=json.loads(chunk[6:])
                         data=data["choices"][0]["delta"]
-                        print(data)
                         yield data
                     except (json.JSONDecodeError,KeyError,IndexError):
                         continue
