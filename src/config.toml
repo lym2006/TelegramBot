@@ -1,5 +1,5 @@
 [network]
-proxy="http://127.0.0.1:7897"
+proxy=""
 
 [api_keys]
-telegram_token="7558512722:AAGhKIm9jA97jqjN2fQLuDEipx6TMOApIfU"
+telegram_token=""

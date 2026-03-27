@@ -7,15 +7,11 @@ logger=logging.getLogger("Bot.Setup.Plugins")
 PLUGIN_ORDER = [
     "help",             #帮助       ***要放在最前，其中包含命令合法性检查
     "welcome",          #没什么
-    #"spider",           #爬虫相关
-    #"image_record",     #图像音频相关
     "emoji",            #emoji合成
     "AI"                #AI部分     ***一定要放在最后，否则其余需要进一步输入信息的指令均无法进行
 ]
 
 def register_routers(dp:Dispatcher,CONFIG:Dict[str,Any]):
-    #from ..plugins.test import router
-    #dp.include_router(router)
     logger.info(f"🔌 开始加载 {len(PLUGIN_ORDER)} 个插件...")
     success_count=0
     for index,plugin_name in enumerate(PLUGIN_ORDER,start=1):

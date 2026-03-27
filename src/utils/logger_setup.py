@@ -24,7 +24,7 @@ def setup_logger():
     fh=RotatingFileHandler(
         log_path, 
         maxBytes=10*1024*1024,# 10MB自动清理
-        backupCount=2,#保留3个（2旧1新）
+        backupCount=2,#保留2个旧日志备份 (即 app.log.1 和 app.log.2)
         encoding='utf-8'
     )
     fh.setFormatter(formatter)

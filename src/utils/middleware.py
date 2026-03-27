@@ -1,8 +1,8 @@
 import logging
-from typing import Dict,Callable,Any,Awaitable
+from typing import Dict,Callable,Any,Awaitable,cast
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message,Update
+from aiogram.types import Message,Update,TelegramObject
 from aiogram.enums import ChatType
 
 class LoggingMiddleware(BaseMiddleware):#用于记录日志
@@ -11,11 +11,14 @@ class LoggingMiddleware(BaseMiddleware):#用于记录日志
         self.logger=logging.getLogger("Bot.Middlewares")
     async def __call__(
         self,
-        handler:Callable[[Update,Dict[str,Any]],Awaitable[Any]],
-        event:Update,
+        handler:Callable[[TelegramObject,Dict[str,Any]],Awaitable[Any]],
+        event:TelegramObject,
         data:Dict[str,Any]
     ):
         try:
+            if not isinstance(event, Update):
+                return await handler(event,data)
+            event=cast(Update,event)
             if not event.message:
                 return await handler(event,data)
             message:Message=event.message

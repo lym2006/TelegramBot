@@ -1,4 +1,3 @@
-import json
 import asyncio
 import time
 from aiogram import Router,Bot
@@ -7,7 +6,8 @@ from aiogram.filters import Filter
 from aiogram.enums import ChatType,ContentType
 
 from ..glo import (
-        rc,cupa,logger,user_session,session_guard,
+        rc,cupa,logger,session_guard,
+        user_session,
         GROUP_TRIGGERS,
         get_name,makedata
     )
@@ -26,13 +26,15 @@ class ChatFilter(Filter):
         if message.chat.type==ChatType.PRIVATE:
             is_command=message.text.startswith('/')
             return not is_command
-        else:
+        elif message.chat.type in [ChatType.GROUP,ChatType.SUPERGROUP]:
             return any(keyword in message.text.lower() for keyword in GROUP_TRIGGERS)
+        else:
+            return False
 
 @chat.message(ChatFilter())#AI对话
 @session_guard
 async def AIchat(message:Message,bot:Bot):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     user_session[user]['md']=True
     city=message.text
     black_list=get_black_list()
@@ -42,7 +44,7 @@ async def AIchat(message:Message,bot:Bot):
     user_session[user]['current_msg']=""
     user_session[user]['last_edit_time']=0
     chat_id=message.chat.id
-    sent_msg=await message.answer("🤔 正在思考中")
+    sent_msg=await message.reply("🤔 正在思考中")
     msg_id=sent_msg.message_id
     payload=makedata(city,user)
     editor=MessageEditor(bot)
