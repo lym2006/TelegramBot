@@ -6,7 +6,7 @@ from aiogram.filters import Filter
 from aiogram.enums import ChatType,ContentType
 
 from ..glo import (
-        session_guard,user_session,active_tasks,
+        session_guard,user_session,active_tasks,TaskQueue,
         GROUP_TRIGGERS,get_name,TaskItem
     )
 from ..services.monitor import monitor_loop
@@ -38,6 +38,8 @@ async def AIchat(message:Message,bot:Bot):
     if user in black_list:
         return
     session=user_session[user]
+    if not 'queue' in session:
+        session['queue']=TaskQueue()
     queue=session['queue']
     session['md']=True
     task=TaskItem(message)
