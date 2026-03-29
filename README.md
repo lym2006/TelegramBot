@@ -117,32 +117,31 @@ TelegramBot/
 │   │   └── plugins_register.py     # 插件自动注册
 │   │
 │   ├── plugins/                    # 🔌 功能插件
-│   │   ├── AI/                     # AI 核心功能
-│   │   │   ├── config.toml         # AI 模块配置
-│   │   │   ├── config.py           # AI 模块配置加载
-│   │   │   ├── glo.py              # 全局变量、函数
-│   │   │   ├── handlers/           # 消息处理器
-│   │   │   │   ├── AIchat.py       # 聊天逻辑
-│   │   │   │   ├── auth.py         # 用户鉴权
-│   │   │   │   ├── balance.py      # 余额查询（待修复）
-│   │   │   │   ├── history.py      # 历史记录
-│   │   │   │   └── identity.py     # 人设更改
-│   │   │   │
-│   │   │   ├── services/           # 业务服务层
-│   │   │   │   ├── black.py        # 读写黑名单
-│   │   │   │   ├── monitor.py      # 监控排队
-│   │   │   │   ├── worker.py       # 执行操作
-│   │   │   │   ├── client.py       # API 客户端
-│   │   │   │   ├── html.py         # HTML 渲染
-│   │   │   │   └── message.py      # 消息处理
-│   │   │   │
-│   │   │   └── record/             # 静态资源/数据记录
-│   │   │       ├── black.txt       # 黑名单
-│   │   │       ├── personality.txt # 人设提示词
-│   │   │       └── *.ttf           # 字体文件
-│   │   │
-│   │   └── help/                   # ❓ 帮助模块
-│   │       └── help.py             # 帮助指令实现
+│   │   ├── help/                   # ❓ 帮助模块
+│   │   │   └── help.py             # 帮助指令实现
+│   │   └── AI/                     # AI 核心功能
+│   │       ├── config.toml         # AI 模块配置
+│   │       ├── config.py           # AI 模块配置加载
+│   │       ├── glo.py              # 全局变量、函数
+│   │       ├── handlers/           # 消息处理器
+│   │       │   ├── AIchat.py       # 聊天逻辑
+│   │       │   ├── auth.py         # 用户鉴权
+│   │       │   ├── balance.py      # 余额查询（待修复）
+│   │       │   ├── history.py      # 历史记录
+│   │       │   └── identity.py     # 人设更改
+│   │       │
+│   │       ├── services/           # 业务服务层
+│   │       │   ├── black.py        # 读写黑名单
+│   │       │   ├── monitor.py      # 监控排队
+│   │       │   ├── worker.py       # 执行操作
+│   │       │   ├── client.py       # API 客户端
+│   │       │   ├── html.py         # HTML 渲染
+│   │       │   └── message.py      # 消息处理
+│   │       │
+│   │       └── record/             # 静态资源/数据记录
+│   │           ├── black.txt       # 黑名单
+│   │           ├── personality.txt # 人设提示词
+│   │           └── *.ttf           # 字体文件
 │   │
 │   └── __init__.py
 │

@@ -2,7 +2,8 @@ import asyncio
 import time
 import logging
 from aiogram import Bot
-from aiogram.enums import ChatType
+from aiogram.enums import ChatType,ParseMode
+from aiogram.exceptions import TelegramRetryAfter
 
 from ..glo import rc,cupa,user_session,TaskItem,makedata
 from ..services.message import MessageEditor,send_long_message,MessageEditError#,handle_ai_message
@@ -21,11 +22,12 @@ async def worker_loop(
     chat_id=message.chat.id
     status_id=task.status_id
     city=message.text
+    draft_id=int(time.time_ns()%2**63)
     user_session[user]['current_think']=""
     user_session[user]['current_msg']=""
-    user_session[user]['last_edit_time']=0
+    user_session[user]['last_draft_time']=0
     payload=makedata(city,user)
-    editor=MessageEditor(bot)
+    #editor=MessageEditor(bot)
     try:
         async with ChatClient() as client:
             async for data in client.stream_chat(payload):
@@ -33,18 +35,19 @@ async def worker_loop(
                     user_session[user]['current_think']+=content if not content.endswith('\n') else content[:-1]
                     current_think=user_session[user]['current_think']
                     current_time=asyncio.get_event_loop().time()
-                    if current_time-user_session[user]['last_edit_time']>0.5:
+                    if current_time-user_session[user]['last_draft_time']>1.2:
                         try:
                             preview_think=current_think[-2000:] if len(current_think)>2000 else current_think
-                            success=await editor.safe_edit(
+                            success=await bot.send_message_draft(
                                     chat_id=chat_id,
-                                    msg_id=status_id,
-                                    text=f"🤔 正在思考中\n{preview_think}"
+                                    draft_id=draft_id,
+                                    text=f"🤔 正在思考中\n{preview_think}",
+                                    
                                 )
                             if success:
-                                user_session[user]['last_edit_time']=current_time
-                        except MessageEditError as err:
-                            if t:=err.wait_time>0:
+                                user_session[user]['last_draft_time']=current_time
+                        except TelegramRetryAfter as err:
+                            if (t:=err.retry_after)>0:
                                 tx=f"⚠️ 触发频控，等待 {t} 秒..."
                                 logger.warning(tx)
                                 await asyncio.sleep(t)
@@ -63,6 +66,17 @@ async def worker_loop(
         final_display_text=f"✅ 思考完成\n{preview_think}"
         try:
             print(f"🚀 正在强制推送最终思考内容...")
+            await bot.send_message_draft(
+                chat_id=chat_id,
+                draft_id=draft_id,
+                text=final_display_text
+            )
+            await asyncio.sleep(1)
+            await bot.send_message_draft(
+                chat_id=chat_id,
+                draft_id=draft_id,
+                text="清除草稿"
+            )
             await editor.safe_edit(
                 chat_id=chat_id,
                 msg_id=status_id,
@@ -83,11 +97,17 @@ async def worker_loop(
     open(cupa/f'{user}.txt','a',encoding='utf8').write(wrt)
     user_session[user]['message'].extend([rc("user",city),rc("assistant",msg)])
     print(msg)
-    final_html=generate_html(msg)
+    html_body,final_html=generate_html(msg)
     with open(cupa/f'{user}.html','w',encoding='utf-8') as a:
         a.write(final_html)
     mark(user,str(cupa/f'{user}.html'))
     if len(msg)>4000:
-        await send_long_message(message,msg)
+        try:
+            await send_long_message(message,html_body,ParseMode.HTML)
+        except:
+            await send_long_message(message,html_body,None)
     else:
-        await message.reply(msg)
+        try:
+            await message.reply(html_body,parse_mode=ParseMode.HTML)
+        except:
+            await message.reply(msg)

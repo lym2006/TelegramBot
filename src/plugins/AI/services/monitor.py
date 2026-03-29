@@ -24,7 +24,7 @@ async def monitor_loop(
             await editor.safe_edit(
                 chat_id=task.message.chat.id,
                 msg_id=task.status_id,
-                text="🤔 正在思考中"
+                text="🧠 开始思考"
             )
             await worker_loop(task,user,bot,editor)
         else:

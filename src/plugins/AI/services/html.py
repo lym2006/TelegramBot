@@ -2,6 +2,7 @@ import re
 import logging
 from pathlib import Path
 from PIL import Image
+from bs4 import BeautifulSoup
 from markdown import markdown
 from selenium.webdriver.chrome.webdriver import WebDriver as ChromeDriver
 from selenium.webdriver.chrome.options import Options
@@ -37,32 +38,27 @@ head='''<!DOCTYPE html>
             width: fit-content;
             min-width: 600px;
             max-width: 1200px; 
-            padding: 5px 5px 85px 5px;
+            padding: 2px;
             border: 3px solid #FFB400; 
             background-color: #ffffff; 
             font-family: 'SegUIEmoji', 'MyMainFont', 'Segoe UI Emoji', sans-serif !important;
-            font-size: 16px;
-            line-height: 1.5;
+            font-size: 14px;
+            line-height: 1.3;
             white-space: pre-wrap;
             word-wrap: break-word;
             color: #333;
             margin: 0;
-
         }
-        p, h1, h2, h3, h4, h5, h6, 
-        ul, ol, dl, 
-        blockquote, pre, figure, figcaption, 
-        table, hr, div {
-            margin-top: 0.8em;
-            margin-bottom: 0.8em;
+        p, h1, h2, h3, h4, h5, h6, ul, ol, dl, blockquote, pre, figure, figcaption, table, hr, div {
+            margin-top: 0.3em;
+            margin-bottom: 0.3em;
         }
         li {
-            margin-top: 0.2em;
-            margin-bottom: 0.2em;
+            margin-top: 0.1em;
+            margin-bottom: 0.1em;
         }
         td, th {
-            margin: 0;
-            padding: 8px;
+            padding: 4px;
         }
         body > :first-child {
             margin-top: 0 !important;
@@ -72,10 +68,10 @@ head='''<!DOCTYPE html>
         }
         pre[class*="language-"] {
             background-color: #2d2d2d !important; 
-            border-radius: 8px;
-            margin-top: 1em !important;
-            margin-bottom: 1em !important;
-            padding: 15px;
+            border-radius: 4px;
+            margin-top: 0.5em !important;
+            margin-bottom: 0.5em !important;
+            padding: 8px;
             border: 1px solid #444;
             color: #f8f8f2 !important;
             white-space: pre-wrap !important;
@@ -84,28 +80,28 @@ head='''<!DOCTYPE html>
             width: 100%; 
             max-width: 100%; 
             display: block;
-            line-height: 1.3 !important;
+            line-height: 1.2 !important;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-            font-size: 14px;
+            font-size: 12px;
         }
         p code, li code, td code, h1 code, h2 code, h3 code {
             background-color: #f0f0f0 !important;
             color: #e83e8c !important;
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 1px 4px;
+            border-radius: 2px;
             font-family: 'Consolas', 'SegUIEmoji', 'MyMainFont', monospace !important;
-            font-size: 0.9em;
+            font-size: 0.85em;
             white-space: nowrap !important;
             margin: 0 !important;
             vertical-align: middle;
         }
         blockquote {
             background-color: #f8f9fa;
-            border-left: 4px solid #e338e6;
-            margin: 1em 0 !important;
-            padding: 10px 15px;
+            border-left: 3px solid #e338e6;
+            margin: 0.5em 0 !important;
+            padding: 5px 10px;
             color: #555;
-            border-radius: 0 4px 4px 0;
+            border-radius: 0 2px 2px 0;
             white-space: pre-wrap; 
         }
         pre code {
@@ -119,7 +115,7 @@ head='''<!DOCTYPE html>
         table {
             border-collapse: collapse;
             width: 100%;
-            margin: 1em 0;
+            margin: 0.5em 0;
         }
         th, td {
             border: 1px solid #ddd;
@@ -144,8 +140,7 @@ head='''<!DOCTYPE html>
             margin: 0;
         }
     </style>
-</head>
-<body>'''
+</head>'''
 
 tail='''
 <div class="color-lump"></div>
@@ -196,7 +191,25 @@ def generate_html(msg:str):
             scripts.append(f'<script src="{CDN_BASE}{js_file}"></script>')
     scripts_html="\n".join(scripts)
     final_html=head+html_body+scripts_html+tail
-    return final_html
+    soup=BeautifulSoup(html_body,'html.parser')
+    unsupported_tags = [
+        'table', 'thead', 'tbody', 'tr', 'caption', 'colgroup', 'col', 'kbd',
+        'div', 'p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+        'script', 'style', 'head', 'meta', 'link', 'img', 'video', 'audio', 'iframe', 'svg'
+    ]
+    for tag in soup.find_all('tr'):
+        tag.insert_after('\n')
+    for tag in soup.find_all('li'):
+        tag.insert_before('\n- ')
+    for tag in soup.find_all(unsupported_tags):
+        tag.unwrap() 
+    text = str(soup)
+    text = text.replace('<br/>', '\n').replace('<br>', '\n')
+    text = text.replace('<th/>', ' | ').replace('<th>', ' | ')
+    text = text.replace('<td/>', ' | ').replace('<td>', ' | ')
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    print(html_body,text)
+    return text,final_html
 
 def mark(nm,path):
     pa=str(cupa/f"{nm}.png")

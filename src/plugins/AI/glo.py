@@ -68,6 +68,8 @@ def ensure_user_session(session:dict,default:dict):
             if user not in session:
                 session[user]=copy.deepcopy(default)
                 print(f"🆕 [Decorator] 已为 {user} 初始化会话")
+            if 'queue' not in session[user]:
+                session[user]['queue']=TaskQueue()
             return await func(message,*args,**kwargs)
         return wrapper
     return ensure_user_session
@@ -79,7 +81,6 @@ session_guard=ensure_user_session(
         'message':ini.copy(),
         'md':False,
         'is_active':False,
-        'queue':TaskQueue(),
         'monitor_event':asyncio.Event(),
         'worker_running':False
     }

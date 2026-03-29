@@ -3,6 +3,7 @@ import logging
 import asyncio
 from aiogram import Bot
 from aiogram.types import Message
+from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 
 from ..glo import user_session,makedata
@@ -42,12 +43,14 @@ class MessageEditor:
             else:
                 raise MessageEditError(str(e))
             
-async def send_long_message(message:Message,text):
+async def send_long_message(message:Message,text,mode):
     total_len=len(text)
     for i in range(0,total_len,4000):
         chunk=text[i:i+4000]
         try:
-            await message.reply(chunk)
+            await message.reply(chunk,parse_mode=mode)
+        except TelegramBadRequest:
+            pass
         except Exception as e:
             logger.error(f"发送失败: {e}")
         if total_len>4000*5:
