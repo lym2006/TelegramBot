@@ -1,10 +1,14 @@
 import re
+import logging
 import asyncio
 from aiogram import Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest
 
-from ..glo import logger
+from ..glo import user_session,makedata
+from ..services.client import ChatClient
+
+logger=logging.getLogger("Bot.Plugins.AI.Message")
 
 class MessageEditError(Exception):
     def __init__(self,msg:str,wait_time:int=0):
@@ -17,7 +21,7 @@ class MessageEditor:
         self.last_edit_time=0
     async def safe_edit(self,chat_id:int,msg_id:int,text:str):
         current_time=asyncio.get_event_loop().time()
-        if current_time-self.last_edit_time<1.5:
+        if current_time-self.last_edit_time<2.5:
             return False
         try:
             await self.bot.edit_message_text(
@@ -48,3 +52,34 @@ async def send_long_message(message:Message,text):
             logger.error(f"发送失败: {e}")
         if total_len>4000*5:
             await asyncio.sleep(1)
+
+'''async def handle_ai_message(city:str,user:str):
+    session=user_session[user]
+    session.update({
+        'md':True,
+        'current_think':"",
+        'current_msg':"",
+    })
+    payload=makedata(city,user)
+    try:
+        async with ChatClient() as client:
+            async for data in client.stream_chat(payload):
+
+                logger.debug(f"🔍 流式返回的原始数据: {data}") 
+
+                if "reasoning_content" in data and (content:=data["reasoning_content"]):
+                    if content.endswith('\n'):
+                        content=content[:-1]
+                    session['current_think']+=content
+                    yield "think",session['current_think']
+                if "content" in data and (content:=data["content"]):
+                    if content.startswith('\n\n'):
+                        content=content[2:]
+                    session['current_msg']+=content
+                    yield "chunk",content
+            final_msg=session['current_msg']
+            final_think=session['current_think']
+            yield "final",(final_msg,final_think)
+    except Exception as e:
+        logger.error(f"❌ 流式请求异常: {e}",exc_info=True)
+        yield "error",str(e)'''

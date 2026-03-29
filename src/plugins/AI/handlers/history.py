@@ -9,7 +9,7 @@ history=Router()
 @history.message(Command('history'))#对话历史
 @session_guard
 async def show_history(message:Message):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     messageList=user_session[user]['message'][-30:]#只显示最近的30条，有需求查本地记录
     print(messageList)
     await message.answer(str([{v['role']: v['content']} for v in messageList]))
@@ -17,14 +17,14 @@ async def show_history(message:Message):
 @history.message(Command('clear'))#清空历史
 @session_guard
 async def clear_history(message:Message):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     user_session[user]['message']=ini.copy()
     await message.answer("记忆清除成功")
 
 @history.message(Command('md'))#发送markdown
 @session_guard
 async def send_markdown(message:Message):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     if user_session[user]['md']:
         await message.answer_photo(FSInputFile(cupa/f'{user}.png'))
     else:

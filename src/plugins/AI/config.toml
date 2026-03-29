@@ -10,6 +10,3 @@ default="""
 重要：接下来的对话若无必要，请不要使用除简体中文和英语之外的任何语言，请使用markdown格式。
 在适当的情境下，请适量使用emoji。
 """
-
-[triggers]
-group_keywords=["fool"]

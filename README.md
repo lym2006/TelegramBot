@@ -14,6 +14,7 @@
 - 📝 **完善日志**: 集成 `logging` 模块 ，支持控制台输出与文件 Rotating。
 - ⚙️ **TOML 配置**: 使用 `config.toml` 进行集中式配置管理，类型安全且易读。
 - 🌐 **浏览器自动化**: 内置 Chrome 自动化功能 (Selenium)，解压即可使用。
+- 🔥 **AI 对话**: 集成 AI 对话功能（仅可私聊使用）。
 
 ## 🛠️ 技术栈
 
@@ -80,9 +81,6 @@ temperature=0.7 # 模型温度
 default="""
 默认人设
 """
-
-[triggers]
-group_keywords=["fool","你的触发词1","词2..."]
 ```
 
 Token 获取：在 [BotFather](https://t.me/BotFather) 对话获取。
@@ -131,6 +129,9 @@ TelegramBot/
 │   │   │   │   └── identity.py     # 人设更改
 │   │   │   │
 │   │   │   ├── services/           # 业务服务层
+│   │   │   │   ├── black.py        # 读写黑名单
+│   │   │   │   ├── monitor.py      # 监控排队
+│   │   │   │   ├── worker.py       # 执行操作
 │   │   │   │   ├── client.py       # API 客户端
 │   │   │   │   ├── html.py         # HTML 渲染
 │   │   │   │   └── message.py      # 消息处理

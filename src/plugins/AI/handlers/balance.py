@@ -1,12 +1,13 @@
+import logging
 from datetime import datetime
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from ..glo import logger
 from ..services.client import WalletClient
 
 balance=Router()
+logger=logging.getLogger("Bot.Plugins.AI.Balance")
 
 @balance.message(Command('balance'))#查询余额
 async def check_balance(message:Message):

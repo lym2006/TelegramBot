@@ -9,7 +9,7 @@ auth=Router()
 
 @auth.message(Command('off'))#关闭对话
 async def turn_off(message:Message):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     black_list=get_black_list()
     if user not in black_list:
         black_list.append(user)
@@ -20,7 +20,7 @@ async def turn_off(message:Message):
 
 @auth.message(Command('on'))#开启对话
 async def turn_on(message:Message):
-    user=get_name(message.chat.id)
+    user=get_name(message)
     black_list=get_black_list()
     if user in black_list:
         black_list.remove(user)

@@ -1,4 +1,5 @@
 import re
+import logging
 from pathlib import Path
 from PIL import Image
 from markdown import markdown
@@ -6,9 +7,10 @@ from selenium.webdriver.chrome.webdriver import WebDriver as ChromeDriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 
-from ..glo import cupa,logger
+from ..glo import cupa
 
 tmp=Path.cwd()/'assets'
+logger=logging.getLogger("Bot.Plugins.AI.html")
 
 head='''<!DOCTYPE html>
 <html lang="zh-CN">

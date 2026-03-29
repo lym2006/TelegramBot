@@ -35,7 +35,7 @@ async def changesetting(message:Message,state:FSMContext):
     tmp=await state.get_data()
     name=tmp['name']
     identity=message.text
-    user=get_name(message.chat.id)
+    user=get_name(message)
     user_session[user]['message'].append(rc("system",f"更改你的身份，你现在是{identity}，名字叫{name}"))
     assert message.from_user,'用户为空'
     await message.answer(f"{makemention(message.from_user)}，你的机器人「{name}」已准备好，可以开始对话。",parse_mode=ParseMode.MARKDOWN_V2)
@@ -55,7 +55,7 @@ async def post_to_system(message:Message,state:FSMContext):
     if not message.text:
         await message.answer("请重新输入文本")
         return
-    user=get_name(message.chat.id)
+    user=get_name(message)
     msg=message.text
     user_session[user]['message'].append(rc('system',msg))
     await message.answer("成功输入")
