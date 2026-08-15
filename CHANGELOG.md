@@ -10,6 +10,24 @@
 
 ### Changed
 - 正在重构：将原有的草稿消息流式输出方案替换为更优雅的内联键盘交互方式
+- 优化 /md 命令判断，避免输出与本次回复不相符的内容
+
+---
+
+## [0.1.5] - 2026-08-15
+
+### Added
+- 新增 `install.bat` 和 `update.bat` 自动安装/更新脚本
+- 新增 Ruff 配置（`pyproject.toml` 中的 ruff 工具配置）
+
+### Changed
+- 修改 `README.md` 安装说明，补充手动安装步骤和 Windows 环境准备指南
+- 修改 `README.md` 有序列表编号在代码块间被重置的问题
+
+### Fixed
+- 修复 `install.bat` 因目录非空导致 `git clone` 失败的问题
+- 修复 `update.bat` 未进入 `TelegramBot` 目录导致找不到 `.git` 和 `.venv` 的问题
+- 统一 `install.bat` 和 `update.bat` 的启动提示信息
 
 ---
 
