@@ -181,7 +181,7 @@ python -m bot
 | **方式二：手动更新** | 少量改动 | 在 `TelegramBot` 目录下执行 `git pull origin main`，然后执行 `pip install -e .` 同步依赖 |
 | **方式三：彻底重建** | 重大架构更新 | 执行 **重建环境的 bash 命令** |
 
-> **重建环境的 `bash` 命令参考**：
+> **重建环境的 `PowerShell` 命令参考**：
 > ```powershell
 > Remove-Item -Recurse -Force .venv
 > python -m venv .venv
