@@ -99,7 +99,7 @@
 本项目在控制台输出中大量使用了 Emoji 表情。传统的 `CMD` 或旧版 `PowerShell` 可能会导致 Emoji 显示为乱码或空白方块。
 为了获得最佳的运行体验，**强烈建议安装并使用微软官方的 [`Windows Terminal`] + [`Git Bash`]**。
 
-1. **安装 `Windows Terminal`**：请在 Microsoft Store 中搜索 `Windows Terminal` 并安装，或使用命令行安装：
+1. **安装 `Windows Terminal`**：请在 Microsoft Store 中搜索 `Windows Terminal` 并安装，或使用 `PowerShell` 安装：
    ```powershell
    winget install --id Microsoft.WindowsTerminal -e
    ```
