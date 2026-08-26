@@ -1,8 +1,8 @@
-# src/utils/logger/enhance.py
+# src/utils/logger/_enhancer.py
 """
-Bot 日志器增强模块
+日志输出增强模块（内部实现）
 
-提供：
+负责：
 - 为指定 Logger 注入自动 exc_info 捕获逻辑
 """
 

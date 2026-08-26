@@ -117,4 +117,4 @@ async def cleanup_loop() -> NoReturn:
                 ]
                 for path in paths:
                     path.unlink(missing_ok=True)
-                logger.info(f"🧹 自动清理长时间不活跃的用户会话: {user}")
+                logger.info(f"🧹 自动长时间不活跃的用户会话: {user}")

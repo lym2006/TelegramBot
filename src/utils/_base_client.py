@@ -1,6 +1,6 @@
-# src/utils/base_client.py
+# src/utils/_base_client.py
 """
-通用异步 HTTP 客户端基类
+通用异步 HTTP 客户端基类（内部实现）
 
 提供：
 - 异步 HTTP 客户端生命周期管理
@@ -9,16 +9,15 @@
 - 自动注入代理
 """
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from httpx import AsyncClient
 
-from .config_loader import CONFIG
-
-logger = logging.getLogger("Bot.Client")
+from .config import get_attr
+from .exception import ConnectionFailedError, HTTPStatusError, RequestTimeoutError
 
 
 class BaseClient:
@@ -32,23 +31,39 @@ class BaseClient:
         cls,
         base_url: str = "",
         headers: dict | None = None,
-        timeout: float = 90.0,
         use_proxy: bool = True,
     ) -> AsyncGenerator[AsyncClient, None]:
         """创建异步客户端上下文管理器"""
-        # 如果外部没传，就自动使用全局配置的代理
-        match use_proxy:
-            case True:
-                proxy = CONFIG["network"]["proxy"]
-            case False:
-                proxy = None
+        default_timeout = get_attr("global.network_timeout", float, 90.0)
+
+        timeout_config = httpx.Timeout(
+            connect=10.0,
+            read=default_timeout,
+            write=default_timeout,
+            pool=default_timeout,
+        )
+
+        proxy = get_attr("global.proxy", str) if use_proxy else None
+
         client = AsyncClient(
-            base_url=base_url, headers=headers, timeout=timeout, proxy=proxy
+            base_url=base_url, headers=headers, timeout=timeout_config, proxy=proxy
         )
         try:
             yield client
         finally:
             await client.aclose()
+
+    @staticmethod
+    def _deal_with_exception(response: httpx.Response, method: str) -> None:
+        """统一处理 HTTP 响应异常，将 httpx 原生异常翻译为自定义异常"""
+        try:
+            response.raise_for_status()
+        except httpx.TimeoutException as e:
+            raise RequestTimeoutError(f"{method} 请求超时: {e}") from e
+        except httpx.ConnectError as e:
+            raise ConnectionFailedError(f"{method} 请求连接失败: {e}") from e
+        except httpx.HTTPStatusError as e:
+            raise HTTPStatusError(e.response.status_code, e.response.text) from e
 
     # ==================== 2. 通用请求方法 ====================
 
@@ -66,14 +81,7 @@ class BaseClient:
             base_url=base_url, headers=headers, use_proxy=use_proxy
         ) as client:
             async with client.stream("POST", request_path, json=payload) as response:
-                if (code := response.status_code) != 200:
-                    try:
-                        error_body = await response.aread()
-                        error_text = error_body.decode("utf-8", errors="ignore")
-                    except Exception:
-                        error_text = "无法读取错误响应体"
-
-                    raise RuntimeError(f"API 请求失败 [{code}]: {error_text}")
+                cls._deal_with_exception(response, "POST")
 
                 async for chunk in response.aiter_lines():
                     if chunk is not None:
@@ -92,16 +100,13 @@ class BaseClient:
             base_url=base_url, headers=headers, use_proxy=use_proxy
         ) as client:
             response = await client.get(request_path)
-            if response.status_code != 200:
-                raise RuntimeError(
-                    f"API 请求失败 [{response.status_code}]: {response.text}"
-                )
+            cls._deal_with_exception(response, "GET")
             return response.json()
 
     @classmethod
     async def get_text(
         cls,
-        base_url: str,
+        base_url: str = "",
         request_path: str = "",
         headers: dict | None = None,
         use_proxy: bool = True,
@@ -111,5 +116,5 @@ class BaseClient:
             base_url=base_url, headers=headers, use_proxy=use_proxy
         ) as client:
             response = await client.get(request_path)
-            response.raise_for_status()
+            cls._deal_with_exception(response, "GET")
             return response.text

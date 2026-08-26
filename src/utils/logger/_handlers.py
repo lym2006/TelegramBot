@@ -1,8 +1,8 @@
-# src/utils/logger/handlers.py
+# src/utils/logger/_handlers.py
 """
-Bot 日志 Handler 创建模块
+日志处理器工厂模块（内部实现）
 
-提供：
+负责：
 - 控制台输出 Handler（stdout）
 - 文件输出 Handler（RotatingFileHandler，10MB 自动切割）
 """
@@ -11,6 +11,10 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+LOG_PATH = Path("logs/bot.log")  # 本地日志路径
+MAX_SIZE = 10  # 最大文件大小（单位：MB）
+BACKUP_COUNT = 2  # 备份数量（2旧1新）
 
 
 def create_console_handler(formatter: logging.Formatter) -> logging.StreamHandler:
@@ -21,28 +25,13 @@ def create_console_handler(formatter: logging.Formatter) -> logging.StreamHandle
 
 
 def create_file_handler(
-    log_path: Path = Path("logs/bot.log"),
-    max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 2,
+    log_path: Path = LOG_PATH,
+    max_bytes: int = MAX_SIZE * 1024 * 1024,
+    backup_count: int = BACKUP_COUNT,
     formatter: logging.Formatter | None = None,
 ) -> RotatingFileHandler:
-    """
-    创建文件输出 Handler
-
-    :param log_path: 日志文件路径
-    :param max_bytes: 单个日志文件最大字节数，默认 10MB
-    :param backup_count: 保留的旧文件数量，默认 2 个（2 旧 1 新）
-    :param formatter: 日志格式器，未传则使用默认格式
-    """
+    """创建文件输出 Handler"""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if formatter is None:
-        from logging import Formatter
-
-        formatter = Formatter(
-            fmt="%(asctime)s | %(name)-25s | %(levelname)-8s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
 
     handler = RotatingFileHandler(
         log_path,

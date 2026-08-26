@@ -82,7 +82,7 @@ async def _get_screenshot(file_name: str, html_path: str) -> str | None:
     """
     if not Path(html_path).exists():
         logger.error(f"❌ 源文件不存在: {html_path}")
-        return None
+        return
 
     new_path = str(RECORD_DIR / f"temp/{file_name}.png")
     page = None
@@ -118,10 +118,10 @@ async def _get_screenshot(file_name: str, html_path: str) -> str | None:
 
     except PlaywrightError as e:
         logger.error(f"❌ PlayWright引擎错误: {e}")
-        return None
+        return
     except Exception as e:
         logger.error(f"❌ 截图发生未知错误: {e}")
-        return None
+        return
     finally:
         # 关闭 Page，防止内存泄漏
         if page:
@@ -189,4 +189,4 @@ async def screenshot(file_name: str, html_path: str) -> str | None:
             return new_path
         except Exception as e:
             logger.error(f"❌ 截图任务整体失败: {e}")
-            return None
+            return

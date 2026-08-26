@@ -9,7 +9,7 @@ AI 核心基础组件
 
 from .chat_context import active_tasks, session_guard, task_queues, user_sessions
 from .client import AIClient
-from .task import TaskQueue, TaskStoppedError, TelegramTaskItem
+from .tasks import AITaskStoppedError, TaskQueue, TelegramTaskItem
 from .utils import build_message, get_name, make_data, retry_sending
 
 __all__ = [
@@ -21,8 +21,8 @@ __all__ = [
     "task_queues",
     "user_sessions",
     # 异步任务队列
+    "AITaskStoppedError",
     "TaskQueue",
-    "TaskStoppedError",
     "TelegramTaskItem",
     # 通用工具函数
     "build_message",

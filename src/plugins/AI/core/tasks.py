@@ -14,7 +14,7 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import Message
 
-from utils.exceptions import TaskStoppedError
+from utils.exception import AITaskStoppedError
 
 from .models import TaskItem
 
@@ -56,7 +56,7 @@ class TelegramTaskItem(TaskItem):
     async def safe_reply(self, msg: str) -> Message:
         """安全回复原消息，若原消息被删除则抛出 TaskStoppedError"""
         if await self.is_deleted():
-            raise TaskStoppedError()
+            raise AITaskStoppedError()
 
         try:
             return await self.message.reply(msg)

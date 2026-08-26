@@ -20,7 +20,7 @@ from aiogram.types import Message
 
 from .config import INIT, RECORD_DIR
 from .models import UserSession
-from .task import TaskQueue
+from .tasks import TaskQueue
 from .utils import get_name
 
 logger_session = logging.getLogger("Bot.Plugins.AI.Session")

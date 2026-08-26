@@ -8,11 +8,12 @@
 """
 
 import importlib
-import logging
 
 from aiogram import Dispatcher
 
-logger = logging.getLogger("Bot.Plugins.Setup")
+from .logger import get_logger
+
+logger = get_logger("Bot.Plugins.Setup")
 
 # 插件加载白名单（严格按此顺序注册）
 # 注意：欢迎与帮助类插件应置于前端，核心 AI 插件必须置于最后
@@ -37,25 +38,31 @@ def register_routers(dispatcher: Dispatcher) -> None:
         try:
             # 动态导入插件模块
             module = importlib.import_module(f"plugins.{plugin_name}")
+            pref = f"[{index}/{total}]"
 
             # 检查插件是否导出了标准的 router 对象
-            if hasattr(module, "router"):
-                dispatcher.include_router(module.router)
-                logger.info(f"✅ [{index}/{total}] 插件 {plugin_name} 注册成功")
+            router = getattr(module, "router", None)
+            if router is not None:
+                dispatcher.include_router(router)
+                logger.info(f"✅ {pref} 插件 {plugin_name} 注册成功")
                 success_count += 1
             else:
                 logger.error(
-                    f"❌ [{index}/{total}] 插件 '{plugin_name}' 缺少 'router' 属性 "
+                    f"❌ {pref} 插件 '{plugin_name}' 缺少 'router' 属性 "
                     f"(请检查其 __init__.py 是否导出了 router)"
                 )
 
-        except ModuleNotFoundError:
-            # 模块不存在
-            logger.error(f"❌ [{index}] 插件 '{plugin_name}' 未找到（请检查目录结构）")
+        except ModuleNotFoundError as e:
+            if f"plugins.{plugin_name}" in str(e):
+                # 插件本身不存在
+                logger.error(f"❌ {pref} 插件 '{plugin_name}' 未找到（请检查目录结构）")
+            else:
+                # 插件内部缺少依赖
+                logger.error(f"❌ {pref} 插件 '{plugin_name}' 缺少依赖: {e}")
 
         except Exception as e:
             # 插件内部的其他致命错误
-            logger.error(f"❌ [{index}] 插件 '{plugin_name}' 加载异常: {e}")
+            logger.error(f"❌ {pref} 插件 '{plugin_name}' 加载异常: {e}")
 
     # 输出最终的加载统计摘要
     logger.info(f"🎉 插件加载完成 | 成功: {success_count} / 总计: {len(_PLUGIN_ORDER)}")
