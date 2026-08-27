@@ -1,4 +1,4 @@
-# src/utils/gui/_app.py
+# src/utils/gui/_main_window.py
 """
 GUI 主窗口模块（内部实现）
 
@@ -6,7 +6,7 @@ GUI 主窗口模块（内部实现）
 - BotGUI 窗口类定义
 - 界面布局构建
 - 按钮事件分发
-- 日志接入
+- 关闭拦截
 """
 
 from collections.abc import Callable
@@ -26,11 +26,6 @@ from utils.exception import ButtonRegisterError
 
 from ._dashboard import DashboardWidget, TextHandler
 from ._theme import SIZES, TOOLBAR_BUTTONS, WINDOW_CONFIG
-
-
-def create_bot_gui() -> "BotGUI":
-    """创建 BotGUI 实例"""
-    return BotGUI()
 
 
 # 定义一个拦截器协议

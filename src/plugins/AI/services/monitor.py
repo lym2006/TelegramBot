@@ -15,7 +15,7 @@ from typing import NoReturn
 
 from aiogram.enums import ChatType
 
-from ..core import TaskStoppedError, task_queues, user_sessions
+from ..core import AITaskStoppedError, task_queues, user_sessions
 from ..core.config import CLEARUP_TIME, RECORD_DIR, WAITING_TIME
 from ..state import user_locks
 from .worker import worker_loop
@@ -52,7 +52,7 @@ async def monitor_loop(user: str) -> None:
                 await task.safe_edit(preview)
                 await worker_loop(task, user)
 
-            except TaskStoppedError:
+            except AITaskStoppedError:
                 logger.warning(f"🚨 {user} 原消息被删除")
                 try:
                     await task.safe_delete()

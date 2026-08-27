@@ -19,7 +19,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramRetryAfter
 
 from ..core import (
     AIClient,
-    TaskStoppedError,
+    AITaskStoppedError,
     TelegramTaskItem,
     build_message,
     make_data,
@@ -142,7 +142,7 @@ async def _update_thinking_ui(task: TelegramTaskItem, current_think: str) -> Non
         preview_think = _trim(current_think)
 
         if await task.is_deleted():
-            raise TaskStoppedError()
+            raise AITaskStoppedError() from None
 
         # 仅私聊模式下更新草稿
         if task.type_ == ChatType.PRIVATE:
@@ -172,7 +172,7 @@ async def _update_final_ui(
             logger.info("🚀 正在推送最终思考内容...")
 
         if await task.is_deleted():
-            raise TaskStoppedError() from None
+            raise AITaskStoppedError() from None
 
         if task.type_ == ChatType.PRIVATE:
             await task.safe_draft("\u061c")
@@ -180,7 +180,7 @@ async def _update_final_ui(
             final_display_text = "\u061c"
 
         await task.safe_edit(final_display_text)
-    except TaskStoppedError:
+    except AITaskStoppedError:
         raise
     except Exception as e:
         logger.warning(f"🚨 UI 更新失败: {e}")
@@ -241,7 +241,7 @@ async def worker_loop(task: TelegramTaskItem, user: str) -> None:
 
         await _save_conversation_record(user, text, final_msg, final_think)
 
-    except TaskStoppedError:
+    except AITaskStoppedError:
         raise
     except Exception as e:
         logger.error(f"❌ Worker 运行时错误: {e}")

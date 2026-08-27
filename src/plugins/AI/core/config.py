@@ -8,7 +8,8 @@ AI 核心配置
 - 运行状态。
 """
 
-from src.utils import CONFIG, ROOT_DIR
+from utils import ROOT_DIR
+from utils.config import get_attr
 
 from .utils import build_message
 
@@ -17,14 +18,14 @@ RECORD_DIR = ROOT_DIR / "data/ai_records"
 BLACK_DIR = ROOT_DIR / "data/blacklists"
 
 # ==================== 2. API 与模型配置 ====================
-MODEL_NAME: str = CONFIG["api"]["model_name"]
-API_KEY: str = CONFIG["api"]["api_key"]
-TEMPERATURE: float = CONFIG["api"]["temperature"]
+MODEL_NAME = get_attr("ai.model_name", str)
+API_KEY = get_attr("ai.api_key", str)
+TEMPERATURE = get_attr("ai.temperature", float)
 
 # ==================== 3. 运行参数配置 ====================
-GROUP_TRIGGERS: list[str] = CONFIG["triggers"]["group_keywords"]
-CLEARUP_TIME: float = CONFIG["data"]["clearup"] * 60 * 60
-WAITING_TIME: float = CONFIG["data"]["waiting"] * 60 * 60
+GROUP_TRIGGERS = get_attr("chore.triggers", list[str])
+CLEARUP_TIME = get_attr("data.clearup", float) * 60 * 60
+WAITING_TIME = get_attr("data.waiting", float) * 60 * 60
 
 # ==================== 4. 初始化状态 ====================
-INIT = [build_message("system", CONFIG["personality"]["default"])]
+INIT = [build_message("system", get_attr("chore.personality", str))]

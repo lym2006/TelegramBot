@@ -13,7 +13,7 @@ from utils.logger import get_logger
 from ._decorator import gui_guard
 
 if TYPE_CHECKING:
-    from gui._app import BotGUI
+    from gui._main_window import BotGUI
 
 
 class BaseController:

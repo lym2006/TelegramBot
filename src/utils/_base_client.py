@@ -34,7 +34,7 @@ class BaseClient:
         use_proxy: bool = True,
     ) -> AsyncGenerator[AsyncClient, None]:
         """创建异步客户端上下文管理器"""
-        default_timeout = get_attr("global.network_timeout", float, 90.0)
+        default_timeout = get_attr("global.network_timeout", float)
 
         timeout_config = httpx.Timeout(
             connect=10.0,

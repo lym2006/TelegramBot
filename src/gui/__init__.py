@@ -8,16 +8,12 @@ GUI 门面模块
 """
 
 import sys
-from typing import TYPE_CHECKING
 
 from utils.exception import FontError, GUIError
 from utils.logger import get_logger
 
 from ._dashboard import DashboardWidget, TextHandler
-
-# 延迟导入 BotGUI，避免循环
-if TYPE_CHECKING:
-    from ._app import BotGUI
+from ._main_window import BotGUI
 
 logger = get_logger("Bot.GUI")
 
@@ -29,10 +25,13 @@ __all__ = [
 ]
 
 
-def create_gui(window: "BotGUI") -> None:
+def create_gui() -> BotGUI:
     """将控制器自动注入到主窗口中，并初始化仪表盘与日志流"""
     # ==================== 1. 组装仪表盘与日志流 ====================
     try:
+        # 实例化窗口
+        window = BotGUI()
+
         # 实例化仪表盘
         dashboard = DashboardWidget(parent=window)
 
@@ -48,11 +47,11 @@ def create_gui(window: "BotGUI") -> None:
 
     except FontError as e:
         # 字体加载失败，记录严重错误并优雅退出
-        logger.critical(f"GUI 初始化失败: {e}")
+        logger.critical(f"❌ GUI 初始化失败: {e}")
         sys.exit(1)
     except GUIError as e:
         # 捕获其他 GUI 初始化异常
-        logger.critical(f"GUI 组装异常: {e}")
+        logger.critical(f"❌ GUI 组装异常: {e}")
         sys.exit(1)
 
     # ==================== 2. 预留 Dialogs 坑位 ====================
@@ -63,3 +62,4 @@ def create_gui(window: "BotGUI") -> None:
     # ==================== 3. 注入 Controller ====================
     # TODO: 将业务控制器注入到主窗口
     # window.controller = controller_instance
+    return window

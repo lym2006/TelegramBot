@@ -9,22 +9,20 @@
 - 安全取值器
 """
 
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast, get_origin
+
+from utils.exception import ConfigAttrError
 
 from .._root_dir import ROOT_DIR
 from ..exception import (
-    ConfigInputError,
+    ConfigError,
     ConfigMissingError,
     ConfigOutputError,
-    ConfigParseError,
 )
 from ..init_files import ensure_file_exists
-from ..logger import get_logger
 from ._io import ConfigIO
 from ._parser import ConfigParser
 from .models import AppConfigData, AppSchema
-
-logger = get_logger("Bot.Config")
 
 # ==================== 模块级常量与单例初始化 ====================
 # 全局配置单例
@@ -55,42 +53,26 @@ __all__ = [
 
 # ==================== 1. 启动阶段 ====================
 def ensure_config() -> None:
-    """检查 config.toml 是否存在，不存在则从 example 复制并抛出异常暂停启动"""
+    """检查 config.toml 是否存在，不存在则从 example 复制并抛出异常"""
     if _CONFIG_PATH.exists():
         return
 
     if _EXAMPLE_PATH.exists():
-        logger.info("💡 未找到 config.toml，正在从模板自动创建...")
         ensure_file_exists("config.toml", "config.example.toml")
-        logger.info("✅ config.toml 创建成功")
-    else:
-        logger.error("❌ 错误: 找不到配置文件与模板文件")
+        raise ConfigMissingError("🚨 已从模板自动创建配置文件") from None
 
-    logger.warning("🛑 启动已暂停：请打开 GUI 配置面板，完善必要配置")
-    raise ConfigMissingError("🚨 配置文件缺失，需用户手动完善") from None
+    raise ConfigMissingError("❌ 错误: 找不到配置文件与模板文件") from None
 
 
 # ==================== 2. 数据读取与 UI 渲染 ====================
 def get_schema() -> AppSchema:
     """获取 UI 渲染所需的强类型 Schema 结构树"""
-    try:
-        return _PARSER.parse()
-    except ConfigMissingError as e:
-        logger.warning(e)
-    except ConfigParseError as e:
-        logger.error(e)
-    return []
+    return _PARSER.parse()
 
 
 def load_config() -> AppConfigData:
     """读取当前 config.toml 数据"""
-    try:
-        return _IO.load()
-    except ConfigMissingError as e:
-        logger.warning(e)
-    except ConfigInputError as e:
-        logger.error(e)
-    return {}
+    return _IO.load()
 
 
 # ==================== 3. 数据保存 ====================
@@ -98,30 +80,47 @@ def save_config(config_data: AppConfigData) -> None:
     """将 GUI 修改后的数据写回磁盘"""
     try:
         _IO.save(config_data)
-        logger.info("✅ 配置已成功保存！")
-    except ConfigOutputError as e:
-        logger.error(e)
-        raise ConfigOutputError(e) from e
+    except ConfigOutputError:
+        raise
 
 
 # ==================== 4. 极简安全取值器 ====================
-def get_attr(
-    key_path: str, expected_type: type[T], default: T | None = None
-) -> T | None:
+def get_attr(key_path: str, expected_type: type[T]) -> T:
     """
     极简安全取值器
 
     支持点号路径穿透，并自动进行类型守卫
-    如 get_attr("global.proxy", str, "default")
+    如 get_attr("global.proxy", str)
     """
-    keys = key_path.split(".")
-    value: Any = _CONFIG
-    for k in keys:
-        if isinstance(value, dict):
-            value = value.get(k)
-        else:
-            return default
-    return value if isinstance(value, expected_type) else default
+    try:
+        keys = key_path.split(".")
+        value: Any = _CONFIG
+
+        # 1. 路径穿透
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                raise ConfigAttrError(key_path, expected_type, value)
+
+        # 2. 空值检查
+        if value is None:
+            raise ConfigAttrError(key_path, expected_type, None)
+
+        # 3. 类型守卫
+        # 提取原始类型
+        origin_type = get_origin(expected_type)
+
+        if isinstance(value, int) and expected_type is float:
+            value = float(value)
+
+        if not isinstance(value, origin_type or expected_type):
+            raise ConfigAttrError(key_path, expected_type, value)
+
+        return cast(T, value)
+
+    except ConfigAttrError as e:
+        raise ConfigError(f"❌ 配置读取失败: {e}\n🚨 请打开配置面板重新填写") from e
 
 
 # ==================== 5. 全局单例注入 ====================

@@ -5,6 +5,8 @@
 集中管理项目中所有的业务异常，避免循环导入问题
 """
 
+from typing import Any
+
 
 # ==================== 1. 全局异常基类 ====================
 class BotError(Exception):
@@ -30,6 +32,22 @@ class ConfigOutputError(ConfigError):
 
 class ConfigParseError(ConfigError):
     """配置文件解析异常"""
+
+
+class ConfigAttrError(ConfigError):
+    """配置取值异常：类型不匹配或键不存在"""
+
+    def __init__(
+        self, key_path: str, expected_type: type, actual_value: Any = None
+    ) -> None:
+        self.key_path = key_path
+        self.expected_type = expected_type
+        self.actual_value = actual_value
+        type_name = expected_type.__name__ if expected_type else "未知"
+        super().__init__(
+            f"配置错误: '{key_path}' 期望 {type_name}"
+            f"{'，当前值为 None（未填写）' if actual_value is None else f'，实际类型为 {type(actual_value).__name__}'}"
+        )
 
 
 # ==================== 3. 网络与 API 异常 ====================

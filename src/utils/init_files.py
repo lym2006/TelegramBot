@@ -7,8 +7,6 @@
 - 临时目录清理
 """
 
-import shutil
-
 from ._root_dir import ROOT_DIR
 from .logger import get_logger
 
@@ -47,18 +45,14 @@ def _ensure_dir_exists(dir_path: str) -> None:
 # ==================== 3. 项目文件初始化 ====================
 def init_project_files() -> None:
     """检查并初始化项目运行所需的必要文件"""
-    # 1. 清理临时目录
-    logger.info("正在删除残留临时文件...")
-    shutil.rmtree(_TEMP_DIR, ignore_errors=True)
-
     logger.info("开始检查项目必要文件...")
 
-    # 2. 初始化必要目录
+    # 1. 初始化必要目录
     _ensure_dir_exists(_TEMP_DIR)
     _ensure_dir_exists(_DOCS_DIR)
     _ensure_dir_exists(_STAGED_DIR)
 
-    # 3. 初始化必要文件
+    # 2. 初始化必要文件
     ensure_file_exists(_BLACKLIST_FILE)
 
     logger.info("文件检查与初始化完成。")

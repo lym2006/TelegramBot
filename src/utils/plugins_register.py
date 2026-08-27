@@ -13,7 +13,7 @@ from aiogram import Dispatcher
 
 from .logger import get_logger
 
-logger = get_logger("Bot.Plugins.Setup")
+logger = get_logger("Bot.Plugins")
 
 # 插件加载白名单（严格按此顺序注册）
 # 注意：欢迎与帮助类插件应置于前端，核心 AI 插件必须置于最后

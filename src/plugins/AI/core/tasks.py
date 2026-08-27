@@ -56,7 +56,7 @@ class TelegramTaskItem(TaskItem):
     async def safe_reply(self, msg: str) -> Message:
         """安全回复原消息，若原消息被删除则抛出 TaskStoppedError"""
         if await self.is_deleted():
-            raise AITaskStoppedError()
+            raise AITaskStoppedError() from None
 
         try:
             return await self.message.reply(msg)
@@ -65,14 +65,14 @@ class TelegramTaskItem(TaskItem):
                 i in str(e).lower()
                 for i in ["message to be replied not found", "message_invalid_id"]
             ):
-                raise TaskStoppedError() from None
+                raise AITaskStoppedError() from None
             else:
                 raise
 
     async def safe_edit(self, msg: str) -> None:
         """安全编辑状态消息，若编辑失败则降级为回复新消息"""
         if await self.is_deleted():
-            raise TaskStoppedError()
+            raise AITaskStoppedError() from None
 
         try:
             await self.bot.edit_message_text(
