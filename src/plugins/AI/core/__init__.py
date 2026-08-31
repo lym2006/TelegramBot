@@ -1,16 +1,14 @@
 # src/plugins/AI/core/__init__.py
 """
-AI 核心基础组件
+AI 核心组件
 
-导出：
 - 网络客户端 (AIClient)
-- 会话状态与通用工具
+- 会话状态
 """
 
-from .chat_context import active_tasks, session_guard, task_queues, user_sessions
-from .client import AIClient
-from .tasks import AITaskStoppedError, TaskQueue, TelegramTaskItem
-from .utils import build_message, get_name, make_data, retry_sending
+from ._chat_context import active_tasks, session_guard, task_queues, user_sessions
+from ._client import AIClient
+from ._tasks import AITaskStoppedError, TaskQueue, TelegramTaskItem
 
 __all__ = [
     # 网络客户端
@@ -24,9 +22,4 @@ __all__ = [
     "AITaskStoppedError",
     "TaskQueue",
     "TelegramTaskItem",
-    # 通用工具函数
-    "build_message",
-    "get_name",
-    "make_data",
-    "retry_sending",
 ]

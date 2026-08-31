@@ -2,19 +2,20 @@
 """
 GUI 控制器异常处理模块（内部实现）
 
-负责：
-- 统一的异常捕获与日志记录
-- 针对已知业务异常与未知系统异常的分级处理
+- 拦截 Controller 业务逻辑中的所有异常
+- 防止未捕获的异常导致 GUI 线程卡死或崩溃
+
+Todo:
+- 未来可引入异常分级处理机制（区分业务异常与系统异常）
 """
 
 from collections.abc import Callable
 from functools import wraps
 from typing import ParamSpec, TypeVar, cast
 
-# from utils.exception import BotError
 from utils.logger import get_logger
 
-logger = get_logger("Bot.GUI.Controller")
+logger = get_logger("GUI.Op.Guard")
 
 # 泛型定义
 P = ParamSpec("P")
@@ -25,7 +26,8 @@ def gui_guard(func: Callable[P, T]) -> Callable[P, T]:
     """
     GUI 按钮事件安全装饰器
 
-    自动捕获业务逻辑中的异常，防止 GUI 卡死，并记录日志
+    作为 BaseController 的底层防御机制，自动拦截所有异常，
+    防止未捕获的异常导致 GUI 线程卡死，并统一记录错误日志
     """
 
     @wraps(func)
@@ -34,7 +36,7 @@ def gui_guard(func: Callable[P, T]) -> Callable[P, T]:
             return func(*args, **kwargs)
 
         except Exception as e:
-            logger.error(f"❌ 执行 [{func.__name__}] 时发生错误：{e}")
+            logger.send_error(f"❌ 执行 [{func.__name__}] 时发生错误", e)
 
         return
 

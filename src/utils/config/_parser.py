@@ -2,15 +2,15 @@
 """
 配置模板解析模块（内部实现）
 
-负责：
-- 读取 config.example.toml，提取注释和默认值，构建强类型的 UI Schema 对象树
+- 解析 config.example.toml，构建 UI Schema 对象树
 """
 
 import re
 import tomllib
 from pathlib import Path
 
-from ..exception import ConfigMissingError, ConfigParseError
+from exceptions import ConfigParseError, ConfigTemplateMissingError
+
 from .models import AppConfigData, AppSchema, FieldSchema, TabData, TabSchema
 
 
@@ -26,9 +26,7 @@ class ConfigParser:
         """将配置解析为 AppSchema 类型"""
         # 1. 检查模板
         if not self._example_path.exists():
-            raise ConfigMissingError(
-                f"🚨 配置模板文件不存在: {self._example_path}"
-            ) from None
+            raise ConfigTemplateMissingError() from None
 
         # 2. 读取与解析
         try:
@@ -38,7 +36,7 @@ class ConfigParser:
                 self._toml_data = tomllib.load(f)
 
         except Exception as e:
-            raise ConfigParseError(f"❌ 解析模板文件失败：{e}") from e
+            raise ConfigParseError() from e
 
         # 3. 提取注释结构，组装 Schema
         return self._build_schema()
@@ -50,7 +48,7 @@ class ConfigParser:
         toml_data = self._toml_data
 
         # 1. 找到所有注释标题块
-        tab_pattern = re.compile(r"^# ---------- (.+?) ----------", re.MULTILINE)
+        tab_pattern = re.compile(r"^# -{10} (.+?) -{10}", re.MULTILINE)
         tab_matches = list(tab_pattern.finditer(raw_text))
 
         # 2. 找到所有 TOML section 头
@@ -78,7 +76,9 @@ class ConfigParser:
 
             fields = self._parse_fields(field_text, toml_section)
             if fields:
-                schema.append(TabSchema(title=tab_title, fields=fields))
+                schema.append(
+                    TabSchema(title=tab_title, namespace=section_key, fields=fields)
+                )
 
         return schema
 

@@ -2,20 +2,21 @@
 """
 配置数据模型模块
 
-负责：
-- 定义配置值的精确类型别名
-- 定义 UI 渲染所需的 Schema 结构
+- 配置值的精确类型别名
+- UI 渲染所需的 Schema 结构
 """
 
 from dataclasses import dataclass, field
 
 # ==================== 1. 核心配置值类型 ====================
+
 # 单个 TOML 配置值
 ConfigValue = (
     str | int | float | bool | None | list["ConfigValue"] | dict[str, "ConfigValue"]
 )
 
 # ==================== 2. 运行时配置数据结构 ====================
+
 # 一个标签页
 TabData = dict[str, ConfigValue]
 
@@ -24,6 +25,8 @@ AppConfigData = dict[str, TabData]
 
 
 # ==================== 3. UI Schema 结构契约 ====================
+
+
 @dataclass
 class FieldSchema:
     """单个配置项的 UI 属性"""
@@ -39,6 +42,7 @@ class TabSchema:
     """一个标签页的 UI 结构"""
 
     title: str  # Tab 标题
+    namespace: str  # TOML 顶层键名
     fields: list[FieldSchema] = field(default_factory=list)
 
 

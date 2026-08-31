@@ -2,7 +2,6 @@
 """
 插件注册与加载工具
 
-提供：
 - 基于白名单的插件顺序控制
 - 插件路由的动态注册与状态监控
 """
@@ -11,9 +10,11 @@ import importlib
 
 from aiogram import Dispatcher
 
+from exceptions import PluginsMissingError
+
 from .logger import get_logger
 
-logger = get_logger("Bot.Plugins")
+logger = get_logger("Plugins")
 
 # 插件加载白名单（严格按此顺序注册）
 # 注意：欢迎与帮助类插件应置于前端，核心 AI 插件必须置于最后
@@ -48,25 +49,27 @@ def register_routers(dispatcher: Dispatcher) -> None:
                 success_count += 1
             else:
                 logger.error(
-                    f"❌ {pref} 插件 '{plugin_name}' 缺少 'router' 属性 "
+                    f"❌ {pref} 插件 '{plugin_name}' 缺少 'router' 属性"
                     f"(请检查其 __init__.py 是否导出了 router)"
                 )
 
         except ModuleNotFoundError as e:
             if f"plugins.{plugin_name}" in str(e):
                 # 插件本身不存在
-                logger.error(f"❌ {pref} 插件 '{plugin_name}' 未找到（请检查目录结构）")
+                msg = f"❌ {pref} 插件 '{plugin_name}' 未找到（请检查目录结构）"
             else:
                 # 插件内部缺少依赖
-                logger.error(f"❌ {pref} 插件 '{plugin_name}' 缺少依赖: {e}")
+                msg = f"❌ {pref} 插件 '{plugin_name}' 缺少依赖"
+
+            logger.send_error(msg, e)
 
         except Exception as e:
-            # 插件内部的其他致命错误
-            logger.error(f"❌ {pref} 插件 '{plugin_name}' 加载异常: {e}")
+            # 插件内部的其他错误
+            logger.send_error(f"❌ {pref} 插件 '{plugin_name}' 加载异常", e)
 
     # 输出最终的加载统计摘要
     logger.info(f"🎉 插件加载完成 | 成功: {success_count} / 总计: {len(_PLUGIN_ORDER)}")
 
-    # 如果所有插件都加载失败，触发严重警告
+    # 如果所有插件都加载失败，抛出异常
     if success_count == 0:
-        logger.critical("🚨 严重警告：未加载任何插件！")
+        raise PluginsMissingError() from None

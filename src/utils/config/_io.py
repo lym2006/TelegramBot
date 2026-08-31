@@ -2,8 +2,7 @@
 """
 配置 I/O 模块（内部实现）
 
-负责：
-- 从磁盘安全地读取配置数据
+- 从磁盘安全地读取配置数据（保留注释元数据）
 - 将内存中的配置数据增量写入磁盘（保留原有注释和格式）
 """
 
@@ -14,7 +13,8 @@ import tomlkit
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
-from ..exception import ConfigInputError, ConfigMissingError, ConfigOutputError
+from exceptions import ConfigInputError, ConfigMissingError, ConfigOutputError
+
 from .models import AppConfigData, TabData
 
 
@@ -25,22 +25,22 @@ class ConfigIO:
         self._config_path = config_path
 
     # ==================== 1. 读取 ====================
+
     def load(self) -> AppConfigData:
         """读取当前 config.toml 数据"""
         if not self._config_path.exists():
-            raise ConfigMissingError(
-                f"🚨 配置文件不存在: {self._config_path}"
-            ) from None
+            raise ConfigMissingError() from None
 
         try:
             raw_text = self._config_path.read_text(encoding="utf-8")
             # 使用 tomlkit 读取，返回带有注释元数据的对象
             return tomlkit.parse(raw_text)
         except Exception as e:
-            raise ConfigInputError(f"❌ 读取 config.toml 失败: {e}") from e
+            raise ConfigInputError() from e
 
     # ==================== 2. 写入 ====================
-    def save(self, config_data: AppConfigData) -> Path | None:
+
+    def save(self, config_data: AppConfigData) -> None:
         """将配置数据增量写入 config.toml"""
         try:
             # 1. 写入前自动备份旧文件
@@ -63,9 +63,7 @@ class ConfigIO:
             self._config_path.write_text(content, encoding="utf-8")
 
         except Exception as e:
-            raise ConfigOutputError(f"❌ 写入配置文件时发生错误: {e}") from e
-
-        return backup_path or None
+            raise ConfigOutputError() from e
 
     def _merge_dict(
         self,

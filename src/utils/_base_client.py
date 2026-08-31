@@ -1,8 +1,7 @@
 # src/utils/_base_client.py
 """
-通用异步 HTTP 客户端基类（内部实现）
+异步 HTTP 客户端工具（内部实现）
 
-提供：
 - 异步 HTTP 客户端生命周期管理
 - 通用的 GET/POST 请求封装
 - SSE 流式解析
@@ -11,17 +10,17 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 import httpx
-from httpx import AsyncClient
+
+from exceptions import ConnectionFailedError, HTTPStatusError, RequestTimeoutError
 
 from .config import get_attr
-from .exception import ConnectionFailedError, HTTPStatusError, RequestTimeoutError
 
 
 class BaseClient:
-    """通用 HTTP 客户端基类，封装底层的请求与连接管理"""
+    """通用 HTTP 客户端基类"""
 
     # ==================== 1. 内部辅助方法 ====================
 
@@ -30,9 +29,9 @@ class BaseClient:
     async def _create_client(
         cls,
         base_url: str = "",
-        headers: dict | None = None,
+        headers: dict[str, Any] | None = None,
         use_proxy: bool = True,
-    ) -> AsyncGenerator[AsyncClient, None]:
+    ) -> AsyncGenerator[httpx.AsyncClient, None]:
         """创建异步客户端上下文管理器"""
         default_timeout = get_attr("global.network_timeout", float)
 
@@ -45,7 +44,7 @@ class BaseClient:
 
         proxy = get_attr("global.proxy", str) if use_proxy else None
 
-        client = AsyncClient(
+        client = httpx.AsyncClient(
             base_url=base_url, headers=headers, timeout=timeout_config, proxy=proxy
         )
         try:
@@ -54,14 +53,16 @@ class BaseClient:
             await client.aclose()
 
     @staticmethod
-    def _deal_with_exception(response: httpx.Response, method: str) -> None:
-        """统一处理 HTTP 响应异常，将 httpx 原生异常翻译为自定义异常"""
+    def _deal_with_exception(
+        response: httpx.Response, method: Literal["POST", "GET"]
+    ) -> None:
+        """统一处理 HTTP 响应异常，翻译为自定义异常"""
         try:
             response.raise_for_status()
         except httpx.TimeoutException as e:
-            raise RequestTimeoutError(f"{method} 请求超时: {e}") from e
+            raise RequestTimeoutError(method) from e
         except httpx.ConnectError as e:
-            raise ConnectionFailedError(f"{method} 请求连接失败: {e}") from e
+            raise ConnectionFailedError(method) from e
         except httpx.HTTPStatusError as e:
             raise HTTPStatusError(e.response.status_code, e.response.text) from e
 
@@ -72,7 +73,7 @@ class BaseClient:
         cls,
         base_url: str = "",
         request_path: str = "",
-        headers: dict | None = None,
+        headers: dict[str, Any] | None = None,
         payload: Any = None,
         use_proxy: bool = True,
     ) -> AsyncGenerator[str, None]:
@@ -88,33 +89,22 @@ class BaseClient:
                         yield chunk
 
     @classmethod
-    async def get_json(
+    async def get_content(
         cls,
+        method: Literal["json", "text"],
         base_url: str = "",
         request_path: str = "",
-        headers: dict | None = None,
+        headers: dict[str, Any] | None = None,
         use_proxy: bool = True,
-    ) -> dict:
-        """通用的 GET 请求并返回 JSON"""
+    ) -> dict[str, Any] | str:
+        """通用的 GET 请求（返回 JSON 或原始文本）"""
         async with cls._create_client(
             base_url=base_url, headers=headers, use_proxy=use_proxy
         ) as client:
             response = await client.get(request_path)
             cls._deal_with_exception(response, "GET")
-            return response.json()
-
-    @classmethod
-    async def get_text(
-        cls,
-        base_url: str = "",
-        request_path: str = "",
-        headers: dict | None = None,
-        use_proxy: bool = True,
-    ) -> str:
-        """通用的 GET 请求并返回原始响应文本"""
-        async with cls._create_client(
-            base_url=base_url, headers=headers, use_proxy=use_proxy
-        ) as client:
-            response = await client.get(request_path)
-            cls._deal_with_exception(response, "GET")
-            return response.text
+            match method:
+                case "json":
+                    return response.json()
+                case "text":
+                    return response.text

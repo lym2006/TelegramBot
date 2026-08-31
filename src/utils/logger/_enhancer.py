@@ -2,26 +2,26 @@
 """
 日志输出增强模块（内部实现）
 
-负责：
-- 为指定 Logger 注入自动 exc_info 捕获逻辑
+- 为指定 Logger 的 debug 方法注入自动 exc_info 捕获逻辑
 """
 
 import logging
 import sys
 
 
-def enhance_logger(logger: logging.Logger) -> None:
-    """
-    为指定的 Logger 增强 error 方法
+class BotLogger(logging.Logger):
+    """Bot 专属的增强型日志器"""
 
-    当调用 error 且未手动传入 exc_info 时，自动捕获当前异常堆栈
-    """
-    original_error = logger.error
+    def __init__(self, name: str, level=logging.NOTSET) -> None:
+        super().__init__(name, level)
 
-    def _enhanced_error(*args, **kwargs) -> None:
-        """传入 exc_info"""
+    def debug(self, msg, *args, **kwargs) -> None:
+        """增强型 debug，自动注入异常堆栈信息"""
         if "exc_info" not in kwargs and sys.exc_info()[0] is not None:
             kwargs["exc_info"] = True
-        return original_error(*args, **kwargs)
+        super().debug(msg, *args, **kwargs)
 
-    logger.error = _enhanced_error
+    def send_error(self, msg: str, e: Exception) -> None:
+        """写入报错日志（分层 GUI 和文件）"""
+        self.error(msg)
+        self.debug(e)

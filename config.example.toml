@@ -4,7 +4,9 @@
 # ============================================================
 
 # ---------- 全局设置 ----------
+
 [global]
+
 # 代理地址
 # 例如: http://127.0.0.1:7890，不需要可留空
 proxy = "http://127.0.0.1:port"
@@ -18,7 +20,9 @@ telegram_token = "123456:abcdefgh"
 network_timeout = 90.0
 
 # ---------- AI 模型设置 ----------
+
 [ai]
+
 # AI 模型名称
 # 从 Siliconflow 的模型广场获取，例如: Pro/deepseek-ai/DeepSeek-R1
 model_name = "Pro/deepseek-ai/DeepSeek-R1"
@@ -32,7 +36,9 @@ api_key = "sk-xxxxxxxxxxxx"
 temperature = 0.7
 
 # ---------- 触发与人设 ----------
+
 [chore]
+
 # 群聊触发关键词列表
 # 用逗号分隔，例如: AI, Bot。用户消息包含时（如 @Bot）触发 AI 回复
 triggers = ["1", "2"]
@@ -47,7 +53,9 @@ personality = """
 """
 
 # ---------- 数据与运维 ----------
+
 [data]
+
 # 数据清理间隔
 # 单位：小时，定期清理过期的会话数据
 clearup = 6.0
