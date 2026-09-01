@@ -36,28 +36,32 @@ def restart_bot() -> None:
 
 # ==================== 2. 注册和清理资源 ====================
 
-_shutdown_hooks = []
+_shutdown_hooks: list[tuple[Any, str]] = []
 
 
-def register_shutdown(hook: Any) -> None:
+def register_shutdown(hook: Any, desc: str) -> None:
     """
     注册一个关闭钩子
 
     任何模块都可以把自己的清理函数塞到这里
     """
-    _shutdown_hooks.append(hook)
+    if desc:
+        logger.info(f"📌 注册关闭钩子: {desc}")
+    _shutdown_hooks.append((hook, desc))
 
 
 async def shutdown_all() -> None:
     """逆序执行所有的钩子（后注册的先关闭，保证依赖关系）"""
     logger.info("🛑 正在执行全局生命周期清理...")
     # 逆序遍历
-    for hook in reversed(_shutdown_hooks):
+    for hook, desc in reversed(_shutdown_hooks):
         try:
+            logger.info(f"⏳ 正在执行: {desc}")
             if inspect.iscoroutinefunction(hook):
                 await hook()
             else:
                 hook()
+            logger.info(f"✅ 已完成：{desc}")
         except Exception as e:
             logger.send_error("⚠️ 关闭钩子执行异常", e)
     logger.info("✅ 全局生命周期清理完毕")

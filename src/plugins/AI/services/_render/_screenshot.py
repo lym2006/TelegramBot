@@ -29,7 +29,7 @@ _semaphore = asyncio.Semaphore(render_config.max_concurrent_screenshots)
 # ==================== 2. 底层截图逻辑 ====================
 
 
-async def _get_screenshot(file_name: str, html_path: Path) -> None:
+async def _get_screenshot(file_name: str, html_path: Path) ->Path|None:
     """执行截图逻辑"""
     if not html_path.exists():
         logger.error(f"❌ 源文件不存在: {html_path}")
@@ -67,7 +67,7 @@ async def _get_screenshot(file_name: str, html_path: Path) -> None:
         await page.set_viewport_size({"width": new_width, "height": new_height})
         await page.wait_for_timeout(render_config.wait_after_resize)
         await page.screenshot(path=new_path, full_page=False)
-        logger.info(f"✅ 截图已保存: {new_path}")
+        logger.info(f"💾 截图已保存: {new_path}")
 
     except PlaywrightError as e:
         logger.send_error("❌ PlayWright引擎错误", e)
@@ -80,6 +80,7 @@ async def _get_screenshot(file_name: str, html_path: Path) -> None:
                 await page.close()
             except Exception:
                 pass
+    return new_path
 
 
 # ==================== 3. 智能裁剪逻辑 ====================

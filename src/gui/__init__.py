@@ -13,7 +13,6 @@ from ._main_window import BotGUI
 from ._qss import build_global_qss
 from ._theme import BODY, FONT, TOOLBAR, TOOLBAR_BUTTONS, WINDOW
 from .controllers import build_controllers
-from .core import WindowCloseInterceptor
 
 logger = get_logger("GUI")
 
@@ -34,7 +33,6 @@ def create_gui(schema: AppSchema, current_config: AppConfigData) -> BotGUI:
         buttons=TOOLBAR_BUTTONS,
         configs=(FONT, WINDOW, BODY, TOOLBAR),
         formatter=FORMATTER,
-        close_interceptor=WindowCloseInterceptor(),
     )
 
     # ==================== 2. 打包业务控制器 ====================

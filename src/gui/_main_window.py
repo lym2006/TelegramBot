@@ -7,13 +7,11 @@ GUI 主窗口模块（内部实现）
 
 import logging
 from collections.abc import Callable
-from typing import Protocol
 
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -21,16 +19,8 @@ from PySide6.QtWidgets import (
 
 from utils.logger import get_logger
 
-from .core import gui_bridge
 from ._dashboard import DashboardWidget, TextHandler
 from ._theme import BodyConfig, FontConfig, ToolbarConfig, WindowConfig
-
-
-# 定义一个拦截器协议
-class _CloseInterceptorProtocol(Protocol):
-    """窗口关闭拦截器协议（内部使用）"""
-
-    def handle(self, event: QCloseEvent) -> None: ...
 
 
 class BotGUI(QMainWindow):
@@ -48,14 +38,13 @@ class BotGUI(QMainWindow):
         buttons: list[tuple[str, str]],
         configs: tuple[FontConfig, WindowConfig, BodyConfig, ToolbarConfig],
         formatter: logging.Formatter,
-        close_interceptor: _CloseInterceptorProtocol,
     ) -> None:
         super().__init__()
         self._qss = qss
         self._buttons = buttons
         self._fonts, self._windows, self._body, self._toolbar = configs
 
-        self._logger=get_logger("GUI")
+        self._logger = get_logger("GUI")
 
         # 基础窗口属性设置
         self.setWindowTitle(self._windows.title)
@@ -68,9 +57,6 @@ class BotGUI(QMainWindow):
         # 仪表盘与文本处理器（纯 UI 组件，内部实例化）
         self._dashboard = DashboardWidget(self._fonts)
         self._text_handler: logging.Handler = TextHandler(self._dashboard, formatter)
-
-        # 窗口关闭拦截器
-        self._close_interceptor = close_interceptor
 
         # 构建纯 UI 界面
         self._build_ui()
@@ -133,27 +119,9 @@ class BotGUI(QMainWindow):
     # ==================== 4. 生命周期 ====================
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
-        """处理窗口关闭时的生命周期事件"""
-        # 1. 弹出确认框（这会阻塞当前线程，等待用户点击）
-        reply = QMessageBox.question(
-            self,
-            "确认退出",
-            "确定要关闭机器人并退出程序吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
-        )
-        
-        # 2. 用户点“是”
-        if reply == QMessageBox.StandardButton.Yes:
-            self._logger.info("用户确认退出，开始清理...")
-            # 发送清理信号给 Bot
-            gui_bridge.request_shutdown.emit()
-            # 接受关闭事件，让窗口先关掉
-            event.accept() 
-        else:
-            # 3. 用户点“否”，极其冷酷地拒绝关闭
-            self._logger.info("用户取消退出")
-            event.ignore()
+        """拦截窗口关闭"""
+        # 拦截原生关闭事件，用户应当点击任务栏按钮=
+        event.ignore()
 
     # ==================== 5. 对外暴露的 UI 操作接口 ====================
 

@@ -1,4 +1,4 @@
-# src/plugins/AI/browser/_manager.py
+# src/plugins/AI/browser/__init__.py
 """
 AI 浏览器门面
 

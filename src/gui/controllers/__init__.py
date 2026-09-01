@@ -12,6 +12,7 @@ from utils.config import AppConfigData, AppSchema
 
 from ._dashboard import DashboardController
 from ._settings import SettingsController
+from ._shutdown import ShutdownController
 from ._system import LogsController, UpdateController
 
 if TYPE_CHECKING:
@@ -19,13 +20,14 @@ if TYPE_CHECKING:
 
 __all__ = [
     # 唯一打包函数
-    "build_controllers"
+    "build_controllers",
 ]
 
 # 内部收集所有 Controller 类，便于统一遍历
 _ALL_CONTROLLER_CLASSES = (
     DashboardController,
     LogsController,
+    ShutdownController,
     UpdateController,
 )
 

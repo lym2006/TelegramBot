@@ -48,15 +48,15 @@ QPushButton:pressed {{
 
 # 危险按钮
 _BUTTON_DANGER_QSS = f"""\
-QPushButton#btn_clear {{
+QPushButton#btn_clear, QPushButton#btn_shutdown {{
     background-color: {BTN_DANGER.bg};
 }}
 
-QPushButton#btn_clear:hover {{
+QPushButton#btn_clear:hover, QPushButton#btn_shutdown:hover {{
     background-color: {BTN_DANGER.hover_bg};
 }}
 
-QPushButton#btn_clear:pressed {{
+QPushButton#btn_clear:pressed, QPushButton#btn_shutdown:pressed {{
     background-color: {BTN_DANGER.pressed_bg};
 }}"""
 

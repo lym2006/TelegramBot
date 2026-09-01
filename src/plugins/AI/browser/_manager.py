@@ -26,7 +26,7 @@ class BrowserManager:
         self._lock = asyncio.Lock()  # 防止并发下启动多个浏览器
 
         # 注册关闭钩子
-        register_shutdown(self._shutdown)
+        register_shutdown(self._shutdown, "Playwright 浏览器")
 
     async def get_browser(self) -> Browser:
         """

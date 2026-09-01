@@ -117,7 +117,7 @@ def get_attr(key_path: str, expected_type: type[T]) -> T:
     origin_type = get_origin(expected_type)
     if not isinstance(value, origin_type or expected_type):
         raise ConfigAttrError(key_path, expected_type, value)
-    
+
     return cast(T, value)
 
 

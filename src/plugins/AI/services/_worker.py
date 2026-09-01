@@ -103,8 +103,6 @@ async def _handle_ai_message(
 
     try:
         async for delta in AIClient.stream_chat(msg):
-            logger.debug("🔍 流式返回的 delta: %s", delta)
-
             # 处理思考过程
             if (reasoning := delta.get("reasoning_content")) is not None:
                 if reasoning.endswith("\n"):

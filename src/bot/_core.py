@@ -53,11 +53,11 @@ class BotEngine:
         self.dispatcher.update.outer_middleware(LoggingMiddleware())
         register_routers(self.dispatcher)
 
-        # 注册临时文件清理钩子
-        register_shutdown(lambda: shutil.rmtree(_TEMP_DIR, ignore_errors=True))
-
-        # 注册 Bot 的网络会话关闭钩子
-        register_shutdown(self._close_session)
+        # 注册清理钩子
+        register_shutdown(self._close_session, "关闭 Bot 网络会话")
+        register_shutdown(
+            lambda: shutil.rmtree(_TEMP_DIR, ignore_errors=True), "清理临时目录"
+        )
 
         # 初始化时监听全局退出指令
         gui_bridge.request_shutdown.connect(self._on_request_shutdown)
@@ -68,8 +68,9 @@ class BotEngine:
 
         # 注册清理任务和关闭钩子
         from plugins.AI.services import cleanup_loop
+
         self._cleanup_task = asyncio.create_task(cleanup_loop())
-        register_shutdown(self._cancel_cleanup)
+        register_shutdown(self._cancel_cleanup, "结束后台清理任务")
 
         await self._start_polling()
 
@@ -89,19 +90,17 @@ class BotEngine:
 
     async def _do_shutdown(self) -> None:
         """执行清理，并通知 GUI"""
-        # 1. 停止轮询
-        await self.dispatcher.stop_polling()
-        # 2. 取消清理任务
-        await self._cancel_cleanup()
-        # 3. 关闭网络会话
-        await self._close_session()
-        # 4. 执行所有注册的钩子（逆序清理）
-        await shutdown_all()
-        # 5. 通知 GUI 关窗口
-        gui_bridge.shutdown_confirmed.emit()
+        try:
+            # 执行所有注册的钩子（逆序清理）"
+            await shutdown_all()
+        except Exception as e:
+            logger.send_error("❌ 清理过程发生错误", e)
+        finally:
+            # 通知 GUI 退出
+            gui_bridge.shutdown_completed_event.set()
 
     async def _cancel_cleanup(self) -> None:
-        """取消后台任务"""
+        """取消后台清理任务"""
         if self._cleanup_task:
             self._cleanup_task.cancel()
             try:
@@ -110,9 +109,8 @@ class BotEngine:
                 pass
 
     async def _close_session(self) -> None:
-        """关闭网络会话逻辑"""
+        """关闭网络会话"""
         await self.bot.session.close()
-        logger.info("💤 Bot 网络会话已关闭")
 
     @retry(
         retry=retry_if_exception_type(TelegramNetworkError),

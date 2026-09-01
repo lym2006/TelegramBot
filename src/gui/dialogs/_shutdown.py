@@ -7,15 +7,15 @@ GUI 配置关闭拦截弹窗模块（内部实现）
 """
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QProgressBar
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from .._theme import BODY
 from .._theme import SHUTDOWN_DIALOG as DIALOG
 from ._base import BaseDialog
 
 
 class ShutdownDialog(BaseDialog):
-    """极其冷酷的退出提示弹窗：无按钮，仅用于展示清理进度"""
+    """退出提示弹窗"""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent=parent)
@@ -26,26 +26,46 @@ class ShutdownDialog(BaseDialog):
 
         # 设置背景色
         self.setStyleSheet(
-            "\n".join(
-                [
-                    f"QDialog {{ background-color: {BODY.bg}; }}",
-                    f"QLabel {{ color: {BODY.color}; }}",
-                ]
-            )
+            f"QDialog {{ background-color: {DIALOG.bg_color}; }}",
         )
 
-        # 布局与 UI 渲染
-        layout = QHBoxLayout(self)
-
-        # 加载动画
-        self._progress = QProgressBar()
-        self._progress.setFixedSize(DIALOG.icon_size, DIALOG.icon_size)
-        self._progress.setTextVisible(False)
-        self._progress.setRange(0, 0)  # 触发无限循环的忙碌动画
+        # 布局与间距
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(*([DIALOG.padding] * 4))
+        layout.setSpacing(DIALOG.spacing)
 
         # 提示文字
         self._label = QLabel(DIALOG.message)
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        layout.addWidget(self._progress)
+        self._label.setStyleSheet(f"color: {DIALOG.text_color};")
+        self._label.setFont(QFont(DIALOG.font_name, DIALOG.font_size))
         layout.addWidget(self._label)
+
+        # 按钮区
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        # 取消按钮
+        self._cancel_btn = QPushButton(DIALOG.cancel_text)
+        self._cancel_btn.setFixedSize(DIALOG.btn_width, DIALOG.btn_height)
+        self._cancel_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {DIALOG.cancel_bg}; "
+            f"color: {DIALOG.cancel_color}; border-radius: {DIALOG.btn_radius}px; }}"
+        )
+        self._cancel_btn.clicked.connect(self.reject)
+
+        # 确认按钮
+        self._confirm_btn = QPushButton(DIALOG.confirm_text)
+        self._confirm_btn.setFixedSize(DIALOG.btn_width, DIALOG.btn_height)
+        self._confirm_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {DIALOG.confirm_bg}; "
+            f"color: {DIALOG.confirm_color}; border-radius: {DIALOG.btn_radius}px; }}"
+        )
+        self._confirm_btn.clicked.connect(self.accept)
+
+        btn_layout.addWidget(self._cancel_btn)
+        btn_layout.addWidget(self._confirm_btn)
+        layout.addLayout(btn_layout)
+
+        # 默认焦点放在取消按钮上（防误触）
+        self._cancel_btn.setFocus()

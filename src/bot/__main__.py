@@ -75,7 +75,6 @@ class Main:
         )
         self._bot_runner.start()
 
-
         # 4. 主线程进入 Qt 事件循环，接管程序
         return app.exec()
 
@@ -121,6 +120,8 @@ class Main:
 
             self._proxy = get_attr("global.proxy", str)
             self._token = get_attr("global.telegram_token", str)
+
+            self._logger.info("✅ 配置加载完成")
 
         except ConfigTemplateMissingError as e:
             self._logger.send_error(ERR_MAPS[type(e)], e)

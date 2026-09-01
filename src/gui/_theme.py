@@ -149,10 +149,32 @@ class SettingsDialogConfig:
 class ShutdownDialogConfig:
     """退出拦截弹窗专属配置"""
 
-    width: int = 300  # 宽度(px)
-    height: int = 80  # 高度(px)
-    icon_size: int = 24  # 加载动画尺寸(px)
-    message: str = "正在安全退出，请稍候..."  # 提示文案
+    # === 尺寸配置 ===
+    width: int = 400  # 宽度(px)
+    height: int = 160  # 高度(px)
+    padding: int = 30  # 内边距(px)
+    spacing: int = 20  # 元素间距(px)
+    btn_width: int = 100  # 按钮宽度(px)
+    btn_height: int = 35  # 按钮高度(px)
+    btn_radius: int = 5  # 按钮圆角(px)
+
+    # === 字体配置 ===
+    font_name: str = "Microsoft YaHei"  # 字体家族名
+    font_size: int = 14  # 弹窗字号
+
+    # === 文案配置 ===
+    title: str = "确认退出"
+    message: str = "确定要关闭机器人并退出程序吗？"
+    cancel_text: str = "取消"
+    confirm_text: str = "确认"
+
+    # === 颜色配置 ===
+    bg_color: str = "#2b2b2b"  # 弹窗背景色
+    text_color: str = "#ffffff"  # 提示文字颜色
+    cancel_bg: str = "#555555"  # 取消按钮背景
+    cancel_color: str = "#ffffff"  # 取消按钮文字
+    confirm_bg: str = "#d32f2f"  # 确认按钮背景（警告红）
+    confirm_color: str = "#ffffff"  # 确认按钮文字
 
 
 # ==================== 10. 实例化配置 ====================
@@ -176,4 +198,5 @@ TOOLBAR_BUTTONS = [
     ("查看日志", "log"),
     ("检查更新", "update"),
     ("清空仪表盘", "clear"),
+    ("关闭机器人", "shutdown"),
 ]
