@@ -36,7 +36,7 @@ def gui_guard(func: Callable[P, T]) -> Callable[P, T]:
             return func(*args, **kwargs)
 
         except Exception as e:
-            logger.send_error(f"❌ 执行 [{func.__name__}] 时发生错误", e)
+            logger.send_error(f"执行 [{func.__name__}] 时发生错误", e)
 
         return
 

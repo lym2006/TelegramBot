@@ -37,7 +37,7 @@ async def show_history(message: Message) -> None:
     file_path = _get_file_path(user)
 
     if not file_path.exists():
-        await message.answer("⚠️ 暂无历史记录")
+        await message.answer("暂无历史记录")
         return
 
     await message.answer_document(
@@ -57,7 +57,7 @@ async def clear_history(message: Message) -> None:
 
     user_sessions[user].message = list(ai_config.init)
     file_path.unlink(missing_ok=True)
-    await message.answer("🧹 记忆清除成功")
+    await message.answer("记忆清除成功")
 
 
 # ==================== 3. /md 图片发送命令 ====================
@@ -73,4 +73,4 @@ async def send_markdown(message: Message) -> None:
     if user_sessions[user].md_status and img_path.exists():
         await message.answer_photo(FSInputFile(img_path))
     else:
-        await message.answer("⚠️ 没有可展示的对话")
+        await message.answer("没有可展示的对话")

@@ -52,20 +52,20 @@ async def monitor_loop(user: str) -> None:
                 await worker_loop(task, user)
 
             except AITaskStoppedError:
-                logger.warning(f"🚨 {user} 原消息被删除")
+                logger.warning(f"{user} 原消息被删除")
                 try:
                     await task.safe_delete()
                 except Exception as e:
-                    logger.send_error("❌ 状态消息删除错误", e)
+                    logger.send_error("状态消息删除错误", e)
 
             except CancelledError:
-                logger.warning(f"🚨 {user} 任务被取消")
+                logger.warning(f"{user} 任务被取消")
                 raise
 
             except Exception as e:
-                logger.send_error(f"❌ {user} 任务出错", e)
+                logger.send_error(f"{user} 任务出错", e)
                 try:
-                    await task.safe_edit("❌ 任务异常终止")
+                    await task.safe_edit("任务异常终止")
                 except Exception:
                     pass
 
@@ -74,16 +74,16 @@ async def monitor_loop(user: str) -> None:
                 await queue.pop_front()
 
     except CancelledError:
-        logger.warning(f"🚨 {user} 监控循环被取消")
+        logger.warning(f"{user} 监控循环被取消")
         raise
 
     except Exception as e:
-        logger.send_error(f"❌ {user} 监控循环崩溃", e)
+        logger.send_error(f"{user} 监控循环崩溃", e)
 
     finally:
         session.is_active = False
         user_locks.pop(user, None)
-        logger.info(f"🔓 {user} 监控循环结束")
+        logger.info(f"{user} 监控循环结束")
 
 
 # ==================== 2. 后台清理循环 ====================
@@ -120,4 +120,4 @@ async def cleanup_loop() -> NoReturn:
                 ]
                 for path in paths:
                     path.unlink(missing_ok=True)
-                logger.info(f"🧹 自动长时间不活跃的用户会话: {user}")
+                logger.info(f"自动长时间不活跃的用户会话: {user}")

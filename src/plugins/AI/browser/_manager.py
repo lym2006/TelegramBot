@@ -43,7 +43,7 @@ class BrowserManager:
             if self._browser and self._browser.is_connected():
                 return self._browser
 
-            logger.info("🚀 正在初始化全局 Playwright 浏览器...")
+            logger.info("正在初始化全局 Playwright 浏览器...")
             # 1. 启动 Playwright 引擎
             self._playwright = await async_playwright().start()
             # 2. 启动 Chromium 浏览器
@@ -51,18 +51,18 @@ class BrowserManager:
                 headless=True,
                 args=browser_config.args,
             )
-            logger.info("✅ 全局浏览器初始化成功")
+            logger.info("全局浏览器初始化成功")
             return self._browser
 
     async def _shutdown(self) -> None:
         """优雅关闭浏览器与 Playwright 引擎"""
         async with self._lock:
             if self._browser:
-                logger.info("💤 正在关闭全局浏览器...")
+                logger.info("正在关闭全局浏览器...")
                 try:
                     await self._browser.close()
                 except Exception as e:
-                    logger.send_error("⚠️ 关闭浏览器错误", e)
+                    logger.send_error("关闭浏览器错误", e)
                 finally:
                     self._browser = None
 
@@ -70,11 +70,11 @@ class BrowserManager:
                 try:
                     await self._playwright.stop()
                 except Exception as e:
-                    logger.warning("⚠️ 停止 Playwright 引擎错误", e)
+                    logger.warning("停止 Playwright 引擎错误", e)
                 finally:
                     self._playwright = None
 
-            logger.info("✅ 全局浏览器资源已彻底释放")
+            logger.info("全局浏览器资源已彻底释放")
 
 
 # 极其冷酷的全局单例（整个 AI 插件共享这一个管家）

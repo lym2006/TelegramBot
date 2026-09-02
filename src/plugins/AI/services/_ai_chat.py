@@ -38,7 +38,7 @@ def _get_preview_text(task: TelegramTaskItem, is_first_task: bool) -> str:
         if task.type_ in [ChatType.GROUP, ChatType.SUPERGROUP]:
             preview += "\n群组不推送思考过程，如需要使用 /history 命令查看"
         return preview
-    return "⏳ 请等待排队"
+    return "请等待排队"
 
 
 # ==================== 2. 核心业务处理 ====================
@@ -68,16 +68,16 @@ async def handle_ai_chat(message: Message, bot: Bot) -> None:
         try:
             sent = await task.safe_reply(preview)
         except Exception as e:
-            logger.send_error("❌ 任务初始化/发送提示失败", e)
+            logger.send_error("任务初始化/发送提示失败", e)
             return
 
         task.status_id = sent.message_id
 
         if not session.is_active:
-            logger.info(f"🖥️ {user} 监控循环启动")
+            logger.info(f"{user} 监控循环启动")
             session.is_active = True
             monitor_task = asyncio.create_task(monitor_loop(user))
             active_tasks.add(monitor_task)
             monitor_task.add_done_callback(active_tasks.discard)
         else:
-            logger.info(f"📥 用户 {user} 新任务入队，当前长度: {queue.size}")
+            logger.info(f"用户 {user} 新任务入队，当前长度: {queue.size}")

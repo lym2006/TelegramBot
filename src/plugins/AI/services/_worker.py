@@ -48,9 +48,9 @@ async def _send_long_message(task: TelegramTaskItem, text: str) -> None:
         try:
             await task.safe_reply(chunk)
         except TelegramBadRequest as e:
-            logger.send_error("❌ 分段消息请求错误", e)
+            logger.send_error("分段消息请求错误", e)
         except Exception as e:
-            logger.send_error("❌ 分段消息未知错误", e)
+            logger.send_error("分段消息未知错误", e)
 
         # 如果总段数超过阈值，且当前不是最后一段，则在发送后休眠防频控
         if total_chunks > ai_config.flood_threshold and idx < total_chunks - 1:
@@ -82,7 +82,7 @@ async def _save_conversation_record(
         with open(rec_dir / f"temp/{user}.md", "a", encoding="utf8") as f:
             f.write(wrt)
     except Exception as e:
-        logger.send_error("❌ 保存本地对话记录失败", e)
+        logger.send_error("保存本地对话记录失败", e)
 
 
 # ==================== 2. 流式数据处理 ====================
@@ -147,7 +147,7 @@ async def _update_thinking_ui(task: TelegramTaskItem, current_think: str) -> Non
 
     except TelegramRetryAfter as e:
         if (t := e.retry_after) > 0:
-            logger.warning(f"🚨 触发频控，等待 {t} 秒...")
+            logger.warning(f"触发频控，等待 {t} 秒...")
             await asyncio.sleep(t)
 
 
@@ -157,12 +157,12 @@ async def _update_final_ui(
     """更新最终的 UI 状态 (思考完成 / 思考中断)"""
     try:
         if has_error:
-            final_display_text = f"🚨 思考中断\n{error_msg}"
-            logger.warning("🚨 思考中断")
+            final_display_text = f"思考中断\n{error_msg}"
+            logger.warning("思考中断")
         else:
             preview_think = _trim(final_think)
-            final_display_text = f"✅ 思考完成\n{preview_think}"
-            logger.info("🚀 正在推送最终思考内容...")
+            final_display_text = f"思考完成\n{preview_think}"
+            logger.info("正在推送最终思考内容...")
 
         if await task.is_deleted():
             raise AITaskStoppedError() from None
@@ -176,7 +176,7 @@ async def _update_final_ui(
     except AITaskStoppedError:
         raise
     except Exception as e:
-        logger.warning(f"🚨 UI 更新失败: {e}")
+        logger.warning(f"UI 更新失败: {e}")
 
 
 # ==================== 4. 最终回复发送 ====================
@@ -201,7 +201,7 @@ async def worker_loop(task: TelegramTaskItem, user: str) -> None:
     message = task.message
     text = message.text
     if text is None:
-        logger.warning("🚨 没有文本")
+        logger.warning("没有文本")
         return
 
     session = user_sessions[user]
@@ -221,7 +221,7 @@ async def worker_loop(task: TelegramTaskItem, user: str) -> None:
                 case "final":
                     final_msg, final_think = data
                 case "error":
-                    logger.send_error("❌ 流式处理错误", data)
+                    logger.send_error("流式处理错误", data)
                     has_error = True
                     error_msg = data
 
@@ -238,5 +238,5 @@ async def worker_loop(task: TelegramTaskItem, user: str) -> None:
     except AITaskStoppedError:
         raise
     except Exception as e:
-        logger.send_error("❌ Worker 运行时错误", e)
-        await task.safe_reply("❌ AI 对话服务暂不可用")
+        logger.send_error("Worker 运行时错误", e)
+        await task.safe_reply("AI 对话服务暂不可用")

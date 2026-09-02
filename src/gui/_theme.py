@@ -131,8 +131,8 @@ class ScrollbarConfig:
 class SettingsDialogConfig:
     """配置编辑弹窗专属配置"""
 
-    min_width: int = 450  # 最小宽度(px)
-    min_height: int = 350  # 最小高度(px)
+    min_width: int = 600  # 最小宽度(px)
+    min_height: int = 500  # 最小高度(px)
     tab_min_width: int = 80  # 标签页标题最小宽度(px)
     tab_padding_v: int = 6  # 标签页垂直内边距(px)
     tab_padding_h: int = 16  # 标签页水平内边距(px)
@@ -143,6 +143,7 @@ class SettingsDialogConfig:
     border_width: int = 1  # 边框宽度(px)
     border_color: str = "#444444"  # 边框色
     finish_btn_min_width: int = 150  # “完成”按钮最小宽度(px)
+    long_height: int = 50  # 长文本框高度
 
 
 @dataclass(frozen=True)

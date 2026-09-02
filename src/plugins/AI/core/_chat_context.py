@@ -65,7 +65,7 @@ def session_guard(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
         # 1. 初始化用户会话
         if user not in user_sessions:
             user_sessions[user] = create_new_session()
-            logger.info(f"🆕 [Decorator] 已为 {user} 初始化会话")
+            logger.info(f"[Decorator] 已为 {user} 初始化会话")
 
             # 将系统提示词写入本地文件
             file_path = ai_config.record_dir / f"temp/{user}.md"

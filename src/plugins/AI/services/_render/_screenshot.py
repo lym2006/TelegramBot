@@ -29,10 +29,10 @@ _semaphore = asyncio.Semaphore(render_config.max_concurrent_screenshots)
 # ==================== 2. 底层截图逻辑 ====================
 
 
-async def _get_screenshot(file_name: str, html_path: Path) ->Path|None:
+async def _get_screenshot(file_name: str, html_path: Path) -> Path | None:
     """执行截图逻辑"""
     if not html_path.exists():
-        logger.error(f"❌ 源文件不存在: {html_path}")
+        logger.error(f"源文件不存在: {html_path}")
         return
 
     new_path = ai_config.record_dir / f"temp/{file_name}.png"
@@ -67,12 +67,12 @@ async def _get_screenshot(file_name: str, html_path: Path) ->Path|None:
         await page.set_viewport_size({"width": new_width, "height": new_height})
         await page.wait_for_timeout(render_config.wait_after_resize)
         await page.screenshot(path=new_path, full_page=False)
-        logger.info(f"💾 截图已保存: {new_path}")
+        logger.info(f"截图已保存: {new_path}")
 
     except PlaywrightError as e:
-        logger.send_error("❌ PlayWright引擎错误", e)
+        logger.send_error("PlayWright引擎错误", e)
     except Exception as e:
-        logger.send_error("❌ 截图发生未知错误", e)
+        logger.send_error("截图发生未知错误", e)
     finally:
         # 关闭 Page，防止内存泄漏
         if page:
@@ -93,7 +93,7 @@ def _crop_screenshot(file_path: Path) -> None:
         img_array = np.array(img)
 
         if img_array.size == 0:
-            logger.warning(f"🚨 图片内容为空，跳过裁剪: {file_path}")
+            logger.warning(f"图片内容为空，跳过裁剪: {file_path}")
             return
 
         is_orange = np.all(img_array == render_config.orange_target, axis=-1)
@@ -101,7 +101,7 @@ def _crop_screenshot(file_path: Path) -> None:
         cols = np.where(~np.all(is_orange, axis=0))[0]
 
         if rows.size == 0 or cols.size == 0:
-            logger.warning("🚨 未检测到有效内容，保留原图")
+            logger.warning("未检测到有效内容，保留原图")
             return
 
         top, bottom = rows[0], rows[-1] + 1
@@ -112,10 +112,10 @@ def _crop_screenshot(file_path: Path) -> None:
         cropped_img.save(file_path)
 
         logger.info(
-            f"✅ 裁剪成功！\n原尺寸: {img.size}\n新尺寸: {cropped_img.size}\n区域: ({left}, {top}) 到 ({right}, {bottom})"
+            f"裁剪成功！\n原尺寸: {img.size}\n新尺寸: {cropped_img.size}\n区域: ({left}, {top}) 到 ({right}, {bottom})"
         )
     except (OSError, ValueError) as e:
-        logger.send_error("❌ 裁剪出错", e)
+        logger.send_error("裁剪出错", e)
 
 
 # ==================== 4. 截图主入口 ====================
@@ -130,4 +130,4 @@ async def screenshot(file_name: str, html_path: Path) -> None:
                 # 将同步的 CPU 密集型裁剪任务放入线程池，避免阻塞事件循环
                 await asyncio.to_thread(_crop_screenshot, new_path)
         except Exception as e:
-            logger.send_error("❌ 截图任务整体失败", e)
+            logger.send_error("截图任务整体失败", e)

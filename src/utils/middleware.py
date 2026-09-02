@@ -65,7 +65,7 @@ class LoggingMiddleware(BaseMiddleware):
 
         except Exception as e:
             # 记录中间件自身的异常
-            self._logger.send_error("❌ LoggingMiddleware 执行出错", e)
+            self._logger.send_error("LoggingMiddleware 执行出错", e)
 
         # 4. 无论日志记录是否成功，都放行事件给下游 Handler
         return await handler(event, data)

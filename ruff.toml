@@ -9,7 +9,9 @@ exclude = [
     "build",
     "dist",
     ".git",
-    "src/plugins/AI/record"
+    "assets",
+    "data",
+    "logs",
 ]
 
 [lint]

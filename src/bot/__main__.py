@@ -23,18 +23,18 @@ from exceptions import (
     ConfigTemplateMissingError,
 )
 from gui import create_gui
-from gui.core import gui_bridge
+from gui.mediator import gui_bridge
 from utils import get_logger
-from utils.config import AppConfigData, AppSchema
+from utils.lifecycle import restart_bot
 
 from ._runner import BotRunner
 
 ERR_MAPS = {
-    ConfigTemplateMissingError: "🛑 缺少配置模板，阻止启动",
-    ConfigMissingError: "🚨 缺少配置文件",
-    ConfigInputError: "❌ 配置写入错误",
-    ConfigParseError: "❌ 配置模板解析错误",
-    ConfigAttrError: "❌ 配置模板配置项不存在或类型错误\n"
+    ConfigTemplateMissingError: "缺少配置模板，阻止启动",
+    ConfigMissingError: "缺少配置文件",
+    ConfigInputError: "配置写入错误",
+    ConfigParseError: "配置模板解析错误",
+    ConfigAttrError: "配置模板配置项不存在或类型错误\n"
     "配置项：%s\n"
     "期望类型：%s\n"
     "实际值：%s",
@@ -59,10 +59,10 @@ class Main:
         """
         # 1. 拉起 GUI
         app = QApplication(sys.argv)
-        window = create_gui(schema=AppSchema(), current_config=AppConfigData())
+        window = create_gui()
         window.show()
         app.processEvents()
-        self._logger.info("🖥️ GUI 主界面已就绪")
+        self._logger.info("GUI 主界面已就绪")
 
         # 2. 启动 Bot 引擎
         self._init_thread = threading.Thread(target=self._background_init, daemon=True)
@@ -75,8 +75,16 @@ class Main:
         )
         self._bot_runner.start()
 
-        # 4. 主线程进入 Qt 事件循环，接管程序
+        # 4. 绑定热重载回调
+        gui_bridge.request_reload.connect(self._handle_reload)
+
+        # 5. 主线程进入 Qt 事件循环，接管程序
         return app.exec()
+
+    def _handle_reload(self) -> None:
+        """处理 GUI 发出的热重载请求"""
+        if self._bot_runner is not None:
+            restart_bot(self._bot_runner.reload_config)
 
     def _background_init(self) -> None:
         """
@@ -84,15 +92,15 @@ class Main:
 
         文件检查 -> 配置加载 -> 版本检查
         """
-        self._logger.info("⏳ 正在初始化环境...")
+        self._logger.info("正在初始化环境...")
         from utils.init_files import init_project_files
 
         init_project_files()
 
-        self._logger.info("⏳ 正在加载配置...")
+        self._logger.info("正在加载配置...")
         self._load_config()
 
-        self._logger.info("⏳ 正在检查版本...")
+        self._logger.info("正在检查版本...")
         from utils import check_updates
 
         asyncio.run(check_updates())
@@ -116,12 +124,16 @@ class Main:
             set_config(config)
 
             # 注入真实数据
-            gui_bridge.real_config_loaded.emit(get_schema(), config)
+            try:
+                gui_bridge.set_data(get_schema(), config)
+                self._logger.info("数据注入成功")
+            except Exception as e:
+                self._logger.send_error("数据注入出错", e)
 
             self._proxy = get_attr("global.proxy", str)
             self._token = get_attr("global.telegram_token", str)
 
-            self._logger.info("✅ 配置加载完成")
+            self._logger.info("配置加载完成")
 
         except ConfigTemplateMissingError as e:
             self._logger.send_error(ERR_MAPS[type(e)], e)
@@ -133,12 +145,12 @@ class Main:
             if isinstance(e, ConfigAttrError):
                 msg = msg % (e.key_path, e.expected_type.__name__, e.actual_value)
             self._logger.send_error(msg, e)
-            self._logger.info("🛠️ 请在 GUI 中配置")
+            self._logger.info("请在 GUI 中配置")
             # TODO:GUI，这里也要写一个拦截启动，直到填好了才能改掉状态
             sys.exit(1)  # 暂时先退出
 
         except Exception as e:
-            self._logger.send_error("❌ 初始化发生未知错误", e)
+            self._logger.send_error("初始化发生未知错误", e)
 
     def _get_config(self) -> tuple[str, str]:
         """供 BotRunner 获取当前配置的接口"""

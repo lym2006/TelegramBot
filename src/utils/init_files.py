@@ -32,7 +32,7 @@ def ensure_file_exists(target_path: str, template_path: str | None = None) -> No
 
     if template_path and (ROOT_DIR / template_path).exists():
         target.write_bytes((ROOT_DIR / template_path).read_bytes())
-        logger.info(f"📃 已从模板创建: {target}")
+        logger.info(f"已从模板创建: {target}")
         return
 
     if template_path is not None:
@@ -53,7 +53,7 @@ def _ensure_dir_exists(dir_path: str) -> None:
 
 def init_project_files() -> None:
     """检查并初始化项目运行所需的必要文件"""
-    logger.info("🔍 开始检查项目必要文件...")
+    logger.info("开始检查项目必要文件...")
 
     # 1. 初始化必要目录
     _ensure_dir_exists(_TEMP_DIR)
@@ -64,4 +64,4 @@ def init_project_files() -> None:
     ensure_file_exists(_BLACKLIST_FILE)
     ensure_file_exists(_LOGS_FILE)
 
-    logger.info("✅ 文件检查与初始化完成。")
+    logger.info("文件检查与初始化完成。")

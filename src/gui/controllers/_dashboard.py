@@ -12,11 +12,13 @@ class DashboardController(BaseController):
     """仪表盘控制器"""
 
     # ==================== 契约声明 ====================
+
     LOGGER_NAME = "GUI.Op.Dashboard"
     BTN_KEY = "clear"
 
     # ==================== 业务逻辑实现 ====================
+
     def _execute(self) -> None:
         """清空仪表盘内容"""
         self.gui.clear_dashboard()
-        self.logger.info("🧹 仪表盘已清空")
+        self.logger.info("仪表盘已清空")

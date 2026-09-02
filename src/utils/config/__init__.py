@@ -47,6 +47,9 @@ __all__ = [
     "get_schema",
     "load_config",
     "save_config",
+    # 模型
+    "AppSchema",
+    "AppConfigData",
 ]
 
 # ==================== 1. 启动阶段 ====================

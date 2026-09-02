@@ -15,7 +15,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramNetworkError
 from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_exponential
 
-from gui.core import gui_bridge
+from gui.mediator import gui_bridge
 from utils import get_logger, register_shutdown
 from utils.lifecycle import shutdown_all
 from utils.middleware import LoggingMiddleware
@@ -64,7 +64,7 @@ class BotEngine:
 
     async def run(self) -> None:
         """对外暴露的启动入口"""
-        logger.info("🎉 机器人连接成功，开始轮询更新...")
+        logger.info("机器人连接成功，开始轮询更新...")
 
         # 注册清理任务和关闭钩子
         from plugins.AI.services import cleanup_loop
@@ -74,13 +74,22 @@ class BotEngine:
 
         await self._start_polling()
 
+    def stop(self) -> None:
+        """对外暴露的停止入口"""
+        logger.info("正在执行热重载...")
+        try:
+            _ = self.dispatcher.stop_polling()
+            logger.info("Telegram 轮询已安全停止")
+        except Exception as e:
+            logger.send_error("停止轮询时发生异常", e)
+
     def _on_request_shutdown(self) -> None:
         """收到退出指令，启动清理流程"""
         if self._is_shutting_down.is_set():
             return
         self._is_shutting_down.set()
 
-        logger.info("🛑 收到退出指令，开始执行全局资源清理...")
+        logger.info("收到退出指令，开始执行全局资源清理...")
 
         # 跨线程安全调度：如果有 event_loop 则用 run_coroutine_threadsafe
         if self._event_loop:
@@ -94,7 +103,7 @@ class BotEngine:
             # 执行所有注册的钩子（逆序清理）"
             await shutdown_all()
         except Exception as e:
-            logger.send_error("❌ 清理过程发生错误", e)
+            logger.send_error("清理过程发生错误", e)
         finally:
             # 通知 GUI 退出
             gui_bridge.shutdown_completed_event.set()
@@ -117,7 +126,7 @@ class BotEngine:
         stop=stop_after_delay(_RECONNECT_TIMEOUT),
         wait=wait_exponential(min=_MIN_RETRY_DELAY, max=_MAX_RETRY_DELAY),
         before_sleep=lambda retry_state: logger.warning(
-            f"🚨 机器人断开连接，准备第 {retry_state.attempt_number} 次重连..."
+            f"机器人断开连接，准备第 {retry_state.attempt_number} 次重连..."
         ),
         reraise=True,
     )

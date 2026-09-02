@@ -150,7 +150,29 @@ QLineEdit {{
 
 QLineEdit:focus {{
     border: {DIALOG.border_width}px solid {BODY.selection_bg};
-}}"""
+}}
+
+QTextEdit {{
+    background-color: {TOOLBAR.bg};
+    color: {BODY.color};
+    border: {DIALOG.border_width}px solid {DIALOG.border_color};
+    border-radius: {GLOBAL.border_radius}px;
+    padding: {DIALOG.input_padding_v}px {DIALOG.input_padding_h}px;
+}}
+
+QTextEdit:focus {{
+    border: {DIALOG.border_width}px solid {BODY.selection_bg};
+}}
+
+QScrollArea {{
+    background-color: {BODY.bg};
+    border: none;
+}}
+
+QScrollArea > QWidget > QWidget {{
+    background-color: {BODY.bg};
+}}
+"""
 
 # ==================== 3. QSS 生成器 ====================
 

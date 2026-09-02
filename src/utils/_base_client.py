@@ -8,6 +8,7 @@
 - 自动注入代理
 """
 
+import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, Literal
@@ -96,15 +97,31 @@ class BaseClient:
         request_path: str = "",
         headers: dict[str, Any] | None = None,
         use_proxy: bool = True,
-    ) -> dict[str, Any] | str:
+        max_retries: int = 3,  # 最多重试次数
+        retry_delay: float = 1.0,  # 重试间隔时间（单位：秒）
+    ) -> dict[str, Any] | str | None:
         """通用的 GET 请求（返回 JSON 或原始文本）"""
-        async with cls._create_client(
-            base_url=base_url, headers=headers, use_proxy=use_proxy
-        ) as client:
-            response = await client.get(request_path)
-            cls._deal_with_exception(response, "GET")
-            match method:
-                case "json":
-                    return response.json()
-                case "text":
-                    return response.text
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with cls._create_client(
+                    base_url=base_url, headers=headers, use_proxy=use_proxy
+                ) as client:
+                    response = await client.get(request_path)
+                    cls._deal_with_exception(response, "GET")
+                    match method:
+                        case "json":
+                            return response.json()
+                        case "text":
+                            return response.text
+
+            except (ConnectionFailedError, RequestTimeoutError):
+                # 对网络异常（连接失败、超时）进行重试
+                if attempt < max_retries:
+                    await asyncio.sleep(retry_delay * attempt)  # 递增延迟
+                    continue  # 重试
+                else:
+                    raise  # 耗尽次数
+
+            except HTTPStatusError:
+                # HTTP 状态码错误不重试
+                raise

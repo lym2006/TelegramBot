@@ -6,7 +6,6 @@ GUI 门面
 - 创建并初始化 GUI 的方法
 """
 
-from utils.config import AppConfigData, AppSchema
 from utils.logger import FORMATTER, get_logger
 
 from ._main_window import BotGUI
@@ -24,7 +23,7 @@ __all__ = [
 ]
 
 
-def create_gui(schema: AppSchema, current_config: AppConfigData) -> BotGUI:
+def create_gui() -> BotGUI:
     """创建并装配 BotGUI 实例"""
     # ==================== 1. 创建纯粹的 UI 渲染器 ====================
 
@@ -37,7 +36,7 @@ def create_gui(schema: AppSchema, current_config: AppConfigData) -> BotGUI:
 
     # ==================== 2. 打包业务控制器 ====================
 
-    controllers = build_controllers(botgui, schema, current_config)
+    controllers = build_controllers(botgui)
 
     # ==================== 3. 防呆校验 ====================
 

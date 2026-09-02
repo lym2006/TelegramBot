@@ -64,7 +64,7 @@ async def input_name(message: Message, state: FSMContext) -> None:
 async def input_identity(message: Message, state: FSMContext) -> None:
     """接收名字，等待描述"""
     if (new_name := message.text) is None:
-        await message.answer("⚠️ 请输入有效的文本")
+        await message.answer("请输入有效的文本")
         return
 
     await state.update_data(name=new_name)
@@ -77,7 +77,7 @@ async def input_identity(message: Message, state: FSMContext) -> None:
 async def change_identity(message: Message, state: FSMContext) -> None:
     """接收描述，完成身份设置"""
     if (new_identity := message.text) is None:
-        await message.answer("⚠️ 请输入有效的文本")
+        await message.answer("请输入有效的文本")
         return
 
     # 防御性获取，防止 FSM 状态丢失导致 KeyError
@@ -91,7 +91,7 @@ async def change_identity(message: Message, state: FSMContext) -> None:
     )
 
     if (from_user := message.from_user) is None:
-        await message.answer("✅ 身份设置成功")
+        await message.answer("身份设置成功")
     else:
         mention = _make_mention(from_user)
         await message.answer(
@@ -117,10 +117,10 @@ async def pre_system(message: Message, state: FSMContext) -> None:
 async def post_to_system(message: Message, state: FSMContext) -> None:
     """接收并注入系统指令"""
     if (text := message.text) is None:
-        await message.answer("⚠️ 请重新输入文本")
+        await message.answer("请重新输入文本")
         return
 
     user = get_name(message)
     user_sessions[user].message.append(build_message("system", text))
-    await message.answer("✅ 系统指令注入成功")
+    await message.answer("系统指令注入成功")
     await state.clear()

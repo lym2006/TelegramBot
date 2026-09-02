@@ -5,6 +5,7 @@ GUI 配置修改弹窗模块（内部实现）
 - 渲染多标签页的配置表单
 - 提供获取修改后配置的接口
 - 区分正常编辑模式和缺失引导模式
+- 配置未修改弹窗
 """
 
 from enum import Enum, auto
@@ -16,9 +17,11 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QTabWidget,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -44,6 +47,15 @@ class ConfigMode(Enum):
     SETUP = auto()  # 缺失引导模式（检测到缺失配置，强制用户填写）
 
 
+class NotChangedDialog:
+    """配置未修改提示弹窗"""
+
+    @staticmethod
+    def show(parent=None) -> None:
+        """展示弹窗"""
+        QMessageBox.information(parent, "提示：", "您未修改任何配置，窗口将直接关闭")
+
+
 class SettingsDialog(BaseDialog):
     """配置面板弹窗"""
 
@@ -64,7 +76,7 @@ class SettingsDialog(BaseDialog):
         self._mode = mode
 
         # 记录所有输入控件，格式: {"field_key": widget}
-        self._inputs: dict[str, QLineEdit] = {}
+        self._inputs: dict[str, QLineEdit | QTextEdit] = {}
 
         # 引导模式下，禁止用户直接关闭弹窗
         if mode == ConfigMode.SETUP:
@@ -80,8 +92,14 @@ class SettingsDialog(BaseDialog):
             tab_data: TabData = {}
             for field in tab.fields:
                 widget = self._inputs.get(field.key)
+                value = None
                 if widget:
-                    tab_data[field.key] = widget.text().strip()
+                    # QTextEdit 用 toPlainText，QLineEdit 用 text
+                    if isinstance(widget, QTextEdit):
+                        value = widget.toPlainText().strip()
+                    else:
+                        value = widget.text().strip()
+                tab_data[field.key] = value
             modified[tab.namespace] = tab_data
         return modified
 
@@ -95,9 +113,7 @@ class SettingsDialog(BaseDialog):
 
         # 如果是引导模式，顶部加一句提示语
         if self._mode == ConfigMode.SETUP:
-            tip_label = QLabel(
-                "🔍 检测到配置文件缺失或存在新增项，请完善以下配置后继续："
-            )
+            tip_label = QLabel("检测到配置文件缺失或存在新增项，请完善以下配置后继续：")
             tip_label.setWordWrap(True)
             root_layout.addWidget(tip_label)
 
@@ -119,16 +135,12 @@ class SettingsDialog(BaseDialog):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
 
-        # 使用调色板强制背景透明
-        palette = scroll.palette()
-        palette.setBrush(scroll.backgroundRole(), Qt.GlobalColor.transparent)
-        scroll.setPalette(palette)
-
         # 关闭自动填充背景
         scroll.setAutoFillBackground(False)
 
         # 创建内容容器（装载表单控件）
         container = QWidget()
+        container.setStyleSheet(f"background-color: {DIALOG.tab_bg};")
         main_layout = QVBoxLayout(container)
         main_layout.setSpacing(DIALOG.tab_spacing)
 
@@ -142,17 +154,29 @@ class SettingsDialog(BaseDialog):
         return scroll
 
     def _create_field(self, field: FieldSchema, namespace: str) -> QWidget:
-        """根据字段类型渲染对应的表单控件"""
+        """根据字段类型动态渲染 QTextEdit 或 QLineEdit"""
         # 创建容器并绑定表单布局
         container = QWidget()
         form = QFormLayout(container)
         form.setSpacing(GLOBAL.border_radius)
 
         # 获取当前配置中的值
-        current_value = self._current.get(namespace, {}).get(field.key, field.default)
+        ns_config = self._current.get(namespace)
+        if ns_config is not None and field.key in ns_config:
+            current_value = ns_config[field.key]
+        else:
+            # 只有 namespace 不存在 或 key 确实缺失时，才用 default 占位
+            current_value = field.default
 
-        # 渲染输入框并填入提取到的值
-        input_widget = QLineEdit(str(current_value))
+        if isinstance(current_value, (list, dict)) or len(str(current_value)) > 50:
+            input_widget = QTextEdit()
+            input_widget.setPlainText(str(current_value))
+            input_widget.setMinimumHeight(DIALOG.long_height)
+        else:
+            input_widget = QLineEdit(str(current_value))
+            input_widget.setPlaceholderText(field.desc)
+
+        # 写说明
         input_widget.setPlaceholderText(field.desc)
 
         # 记录控件引用（外部点击“保存”时，通过字典找到输入框并获取文本）

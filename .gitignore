@@ -39,6 +39,7 @@ logs/
 # --- 敏感信息与配置文件 ---
 .env
 /config.toml
+/config.toml.bak
 secrets.json
 *.key
 *.pem

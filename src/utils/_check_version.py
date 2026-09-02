@@ -9,6 +9,8 @@
 import tomllib
 from typing import cast
 
+from packaging.version import Version
+
 from exceptions import NetworkError
 
 from ._base_client import BaseClient
@@ -35,7 +37,7 @@ def _get_local_version() -> str | None:
         local_version = content["project"]["version"]
         return local_version if local_version else None
     except Exception as e:
-        logger.send_error("❌ 读取本地版本失败", e)
+        logger.send_error("读取本地版本失败", e)
         return
 
 
@@ -51,10 +53,10 @@ async def _get_remote_version() -> str | None:
         data = tomllib.loads(cast(str, text))
         return data["project"]["version"]
     except NetworkError as e:
-        logger.send_error("❌ 读取远程版本过程出现网络异常", e)
+        logger.send_error("读取远程版本过程出现网络异常", e)
         return
     except Exception as e:
-        logger.send_error("❌ 读取远程版本过程出现未知异常", e)
+        logger.send_error("读取远程版本过程出现未知异常", e)
         return
 
 
@@ -67,17 +69,20 @@ async def check_updates() -> None:
     remote_version = await _get_remote_version()
 
     if local_version is None:
-        logger.error("❌ 无法读取本地版本号，跳过版本检查")
+        logger.error("无法读取本地版本号，跳过版本检查")
+        return
 
     if remote_version is None:
-        logger.warning("🚨 远程版本获取失败，无法完成版本检查，继续启动机器人")
+        logger.warning("远程版本获取失败，无法完成版本检查，继续启动机器人")
+        return
 
-    if local_version == remote_version:
-        logger.info(f"✅ 当前已是最新版本: {local_version}")
-    else:
+    if Version(local_version) < Version(remote_version):
         logger.warning(
-            "🆕 发现新版本\n"
+            "发现新版本\n"
             f"当前版本: {local_version}\n"
             f"最新版本: {remote_version}\n"
             '请点击 "立即更新" 按钮'
         )
+        return
+
+    logger.info(f"当前已是最新版本: {local_version}")

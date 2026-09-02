@@ -96,7 +96,7 @@ def retry_sending() -> Callable[[Callable[P, T]], Callable[P, T]]:
             stop=stop_after_attempt(_MAX_RETRIES),
             wait=wait_exponential(min=_MIN_RETRY_DELAY, max=_MAX_RETRY_DELAY),
             before_sleep=lambda retry_state: logger_retry.warning(
-                f"🚨 消息发送失败，正在第 {retry_state.attempt_number} 次重试..."
+                f"消息发送失败，正在第 {retry_state.attempt_number} 次重试..."
             ),
             reraise=True,
         )

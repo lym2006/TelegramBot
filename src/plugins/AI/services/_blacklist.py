@@ -52,9 +52,9 @@ async def get_black_list() -> list[str]:
             # 使用 read_text 确保文件句柄在读取后自动关闭
             content = await asyncio.to_thread(_PATH.read_text, encoding="utf-8")
             _cache = [line.strip() for line in content.splitlines() if line.strip()]
-            logger.info(f"✅ 黑名单加载成功，共 {len(_cache)} 条记录")
+            logger.info(f"黑名单加载成功，共 {len(_cache)} 条记录")
         except Exception as e:
-            logger.send_error("❌ 读取黑名单文件失败", e)
+            logger.send_error("读取黑名单文件失败", e)
             _cache = []  # 读取失败时兜底为空列表，防止反复重试
 
         return _cache
@@ -76,6 +76,6 @@ async def save_black_list(black_list: list[str]) -> None:
 
             # 写入成功后，立即同步更新内存缓存
             _cache = black_list
-            logger.info(f"✅ 黑名单保存成功，当前共 {len(_cache)} 条记录")
+            logger.info(f"黑名单保存成功，当前共 {len(_cache)} 条记录")
         except Exception as e:
-            logger.send_error("❌ 保存黑名单文件失败", e)
+            logger.send_error("保存黑名单文件失败", e)

@@ -27,20 +27,20 @@ class LogsController(BaseController):
     # ==================== 业务逻辑实现 ====================
     def _execute(self) -> None:
         """打开日志文件所在目录"""
-        self.logger.info("📂 正在打开日志文件目录...")
+        self.logger.info("正在打开日志文件目录...")
         if sys.platform == "win32":
             try:
                 os.startfile(_LOGS_DIR)
-                self.logger.info("✅ 成功打开日志目录")
+                self.logger.info("成功打开日志目录")
 
             except OSError as e:
                 # 捕获 Windows 底层 API 可能抛出的系统级错误
                 # 比如路径含空格、权限不足、explorer 崩溃等
-                self.logger.send_error("❌ 打开日志目录失败", e)
+                self.logger.send_error("打开日志目录失败", e)
 
             except Exception as e:
                 # 防止任何未知异常导致 GUI 闪退
-                self.logger.send_error("❌ 发生未知错误", e)
+                self.logger.send_error("发生未知错误", e)
 
 
 class UpdateController(BaseController):
@@ -52,5 +52,5 @@ class UpdateController(BaseController):
 
     def _execute(self) -> None:
         """检查版本更新"""
-        self.logger.info("🔄 正在检查版本更新...")
+        self.logger.info("正在检查版本更新...")
         asyncio.run(check_updates())

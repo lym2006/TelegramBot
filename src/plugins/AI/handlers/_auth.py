@@ -43,6 +43,6 @@ async def turn_on(message: Message) -> None:
     if user in black_list:
         black_list.remove(user)
         await save_black_list(black_list)
-        await message.answer(f"✅ 成功将用户 [{user}] 移出黑名单")
+        await message.answer(f"成功将用户 [{user}] 移出黑名单")
     else:
-        await message.answer(f"⚠️ 用户 [{user}] 不存在黑名单内")
+        await message.answer(f"用户 [{user}] 不存在黑名单内")

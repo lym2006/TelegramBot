@@ -43,6 +43,7 @@ class BotGUI(QMainWindow):
         self._qss = qss
         self._buttons = buttons
         self._fonts, self._windows, self._body, self._toolbar = configs
+        self._hidden_actions = {"shutdown"}  # 不渲染只回调的按钮
 
         self._logger = get_logger("GUI")
 
@@ -94,8 +95,12 @@ class BotGUI(QMainWindow):
 
         # 遍历配置列表，动态生成按钮
         for text, key in self._buttons:
-            btn = QPushButton(text)
             btn_id = f"btn_{key}"
+
+            if key in self._hidden_actions:
+                continue  # 直接跳过按钮的创建和布局添加
+
+            btn = QPushButton(text)
             btn.setObjectName(btn_id)  # 用于 QSS 选择器 QPushButton#btn_key
 
             # 统一绑定点击事件
@@ -122,6 +127,7 @@ class BotGUI(QMainWindow):
         """拦截窗口关闭"""
         # 拦截原生关闭事件，用户应当点击任务栏按钮=
         event.ignore()
+        self._handle_button("btn_shutdown")
 
     # ==================== 5. 对外暴露的 UI 操作接口 ====================
 

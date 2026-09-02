@@ -18,10 +18,9 @@ class ShutdownDialog(BaseDialog):
     """退出提示弹窗"""
 
     def __init__(self, parent=None) -> None:
-        super().__init__(parent=parent)
+        super().__init__(parent=parent, title="关闭确认")
 
-        # 退出弹窗无边框
-        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        # 固定大小
         self.setFixedSize(DIALOG.width, DIALOG.height)
 
         # 设置背景色
