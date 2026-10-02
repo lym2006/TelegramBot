@@ -40,62 +40,74 @@ known-first-party = ["plugins", "utils", "core", "data", "services", "adapters",
 
 原因：现有只列了 `plugins` 和 `utils`，新增的四个包不加进去的话，ruff 会把它们的 import 排到第三方库组里，后续每阶段都会报排序错误。
 
-### 0.4 pyproject.toml 加分层契约
+### 0.4 分层契约：`.importlinter`
 
-在 `pyproject.toml` 末尾追加：
+契约配置放项目根的 `.importlinter`（INI），**不进 pyproject**——开发工具配置不污染项目元数据。契约按阶段渐进启用：每条契约在它所约束的层落地时才写进文件。阶段 0 就写死全部契约会让 `plugins 不依赖 aiogram` 当场把未迁移的 `welcome` / `help` / `AI` 全部标红（实测 12 处违规），闸门失去基线意义。
 
-```toml
-[tool.importlinter]
-root_package = "src"
+阶段 0 的最终文件内容（当前仓库里已是这份，跑出来 `2 kept, 0 broken`）：
 
-[[tool.importlinter.contracts]]
-name = "core 零外部依赖"
-type = "forbidden"
-source_modules = ["src.core"]
-forbidden_modules = [
-    "aiogram",
-    "PySide6",
-    "aiosqlite",
-    "httpx",
-    "playwright",
-    "tenacity",
-    "markdown",
-    "PIL",
-    "cv2",
-    "numpy",
-]
+```ini
+[importlinter]
+root_packages =
+    core
+    data
+    services
+    adapters
+    plugins
+    utils
+    bot
+    exceptions
+    gui
+    messages
+include_external_packages = True
 
-[[tool.importlinter.contracts]]
-name = "services 不依赖 data 与 adapters"
-type = "forbidden"
-source_modules = ["src.services"]
-forbidden_modules = ["src.data", "src.adapters"]
+[importlinter:contract:core-zero-deps]
+name = core zero external dependencies
+type = forbidden
+source_modules =
+    core
+forbidden_modules =
+    aiogram
+    PySide6
+    aiosqlite
+    httpx
+    playwright
+    tenacity
+    markdown
+    PIL
+    cv2
+    numpy
 
-[[tool.importlinter.contracts]]
-name = "plugins 不依赖平台 SDK"
-type = "forbidden"
-source_modules = ["src.plugins"]
-forbidden_modules = ["aiogram", "src.adapters"]
-
-[[tool.importlinter.contracts]]
-name = "data 与 adapters 互不知晓"
-type = "forbidden"
-source_modules = ["src.data"]
-forbidden_modules = ["src.adapters"]
-
-[[tool.importlinter.contracts]]
-name = "adapters 不依赖 data"
-type = "forbidden"
-source_modules = ["src.adapters"]
-forbidden_modules = ["src.data"]
+[importlinter:contract:data-adapters-isolation]
+name = data and adapters isolation
+type = forbidden
+source_modules =
+    data
+forbidden_modules =
+    adapters
 ```
 
-注意：此时 `src/core` 等目录还不存在，import-linter 会跳过不存在的模块，不会报错。这是预期行为——契约从阶段 1 起才真正生效。
+要点：
+
+- `root_packages` 用裸顶层包名，与代码里 `from core import ...` 的 import 前缀一致。`root_package = src` 经实测也能工作（`src/__init__.py` 存在且 CWD 在路径上），但裸包名与运行时口径统一，不再改回。
+- `include_external_packages = True` 不能少：`forbidden_modules` 里出现 aiogram 这类第三方包时，缺这行 lint-imports 直接报错退出。
+- 契约名用英文：configparser 按系统编码读文件，中文契约名依赖 `PYTHONUTF8=1`（你用户环境变量已设）。英文命名则不依赖任何环境变量，换机器、进 CI 都不会崩。
+- 改这个文件别用 PowerShell 的 `Set-Content -Encoding utf8`——PS 5.1 会写 BOM，configparser 报 `File contains no section headers`（实测踩过）。编辑器保存为"UTF-8 无 BOM"。
+
+后续阶段追加的契约段落（到达对应阶段时整段贴进文件）：
+
+| 阶段 | 追加契约 | 生效前提 |
+| :--- | :--- | :--- |
+| 2 | `adapters 不依赖 data`（source=adapters, forbidden=data） | data 层落地 |
+| 3+4 | `services 不依赖 data 与 adapters` | services 开始被插件引用 |
+| 5 | `plugins 不依赖 adapters`（先不禁 aiogram） | handler 签名改造完成 |
+| 7 | `plugins 不依赖平台 SDK 与适配层` | 全部插件迁移完 |
 
 ### 0.5 验证
 
 ```powershell
-# 契约检查（应全部 PASS 或 SKIP）
+# 项目根执行。新开的非登录 shell 可能没继承 PYTHONUTF8，保险起见显式设置
+$env:PYTHONUTF8 = '1'
 lint-imports
 
 # lint 基线确认（此时不应引入新错误）
@@ -103,12 +115,14 @@ ruff check src
 ruff format --check src
 ```
 
-`lint-imports` 输出里每条契约显示 `PASSED` 或 `SKIPPED` 即通过。若出现 `FAILED`，说明现有代码已有跨层导入，记下来作为豁免清单（暂不改代码，后续阶段逐步消除）。
+预期输出 `Contracts: 2 kept, 0 broken`。空壳包（core/data 等）0 imports 属正常。若新增包后报 PackageNotFound，说明 editable 安装的 .pth 没挂上新目录，补跑一次 `pip install -e ".[dev]"`。
+
+**未来新增插件的姿势**：`plugins/` 下建目录 + `_PLUGIN_ORDER` 白名单加一行，契约对包生效、不改配置。平台独有能力写进 `adapters/` 实现，插件里 import 到会撞阶段 5/7 启用的契约——闸门替你守住"插件保持平台无关"这条线。
 
 ### 0.6 提交
 
 ```
-git add pyproject.toml ruff.toml
+git add pyproject.toml ruff.toml .importlinter
 git commit -m "chore: 添加 aiosqlite、import-linter 与分层契约"
 ```
 
@@ -131,14 +145,14 @@ mkdir src\core\dto, src\core\domain, src\core\ports
 | 文件 | 文档章节 | 内容摘要 |
 | :--- | :--- | :--- |
 | `src/core/__init__.py` | — | 空门面，后续按需导出 |
-| `src/core/errors.py` | — | 领域异常：`MessageVanishedError`、`TaskAbortedError`、`PrincipalNotFoundError` |
+| `src/exceptions/_domain.py` | — | 领域异常族，继承现有 `AIError`：`MessageVanishedError`、`TaskAbortedError`、`PrincipalNotFoundError`（异常基类 `BotError` 已有，禁止新建第二套） |
 | `src/core/domain/__init__.py` | — | 空门面 |
 | `src/core/domain/_platform.py` | 3.1 | `Platform`、`ChatScope` 命名空间类 |
 | `src/core/domain/_task_meta.py` | 3.3 | `TaskKind`、`TaskStatus`、`TaskPriority` |
 | `src/core/domain/_capability.py` | 4.5 | `AdapterCapability` 能力位（8 个，不含 STREAM_DRAFT） |
 | `src/core/domain/_steps.py` | 5.5 | 多步会话步骤枚举（`IdentityStep`、`SystemInjectStep`） |
 | `src/core/dto/__init__.py` | — | 门面，导出全部 DTO |
-| `src/core/dto/_identity.py` | 3.1 | `Principal`、`MessageRef` |
+| `src/core/dto/_identity.py` | 3.1 | `PrincipalDTO`、`MessageRefDTO` |
 | `src/core/dto/_content.py` | 3.2 | `ContentKind`、`ContentDTO` |
 | `src/core/dto/_event.py` | 3.2 | `InboundEventDTO`、`CallbackEventDTO` |
 | `src/core/dto/_session.py` | 3.3 | `MessageDTO`、`SessionDTO`、`SessionPatchDTO` |
@@ -178,7 +192,7 @@ ruff format --check src/core
 ### 1.5 提交
 
 ```
-git add src/core/
+git add src/core/ src/exceptions/_domain.py
 git commit -m "feat(core): 添加 DTO、端口与领域值对象骨架"
 ```
 
@@ -336,7 +350,7 @@ git commit -m "feat(data): SQLite Repository、迁移运行器与降级保护"
 
 **改动文件**：`src/plugins/AI/utils.py`
 
-- 新增 `resolve_principal(message: Message) -> Principal` 函数，替代 `get_name`。
+- 新增 `resolve_principal(message: Message) -> PrincipalDTO` 函数，替代 `get_name`。
 - 逻辑：从 `message.chat.type` 推断 `ChatScope`，从 `message.chat.id` 和 `message.from_user.id` 提取 ID，platform 固定 `"telegram"`。
 - `get_name` 保留但标记 `deprecated`，内部委托给 `resolve_principal().key`，供过渡期使用。
 
@@ -357,7 +371,7 @@ git commit -m "feat(data): SQLite Repository、迁移运行器与降级保护"
 创建 `src/services/_session.py`：
 
 - `SessionService` 类，构造函数接收 `SessionRepository` 和 `PrincipalRepository`。
-- 实现 `docs/refactor-design.md` 4.3 节的全部方法：`snapshot`、`history_for_model`、`append_exchange`、`inject_system`、`reset`、`touch`、`set_md_ready`、`purge_stale`。
+- 实现 `docs/refactor-design.md` 4.3 节的全部方法：`snapshot`、`history_for_model`、`append_exchange`、`inject_system`、`reset`、`touch`、`purge_stale`。
 - `history_for_model` 内部把 `MessageDTO` 转为 `dict[str, str]`（`{"role": ..., "content": ...}`），转换收在此一处。
 
 创建 `src/services/__init__.py`：
@@ -373,7 +387,7 @@ git commit -m "feat(data): SQLite Repository、迁移运行器与降级保护"
 | `user_sessions[user].message.append(build_message("system", ...))` | `_identity.py:89,124` | `await sessions.inject_system(principal.key, text)` |
 | `session.message.extend([...])` | `_worker.py:229` | `await sessions.append_exchange(principal.key, user_text, reply_text)` |
 | `user_sessions[user].message = list(ai_config.init)` | `_history.py:57` | `await sessions.reset(principal.key)` |
-| `user_sessions[user].md_status` | `_history.py:72` | `(await sessions.snapshot(principal.key)).md_ready` |
+| `user_sessions[user].md_status` | `_history.py:72`、`_worker.py:206` | 删除，无替代字段；渲染判定下沉到消息级（见设计文档 4.3） |
 | `session.is_active = True/False` | `_ai_chat.py:70`、`_monitor.py:40,84` | 由 TaskScheduler 内部统管，插件不再直接改 |
 | `user_sessions[user].last_active = time.time()` | `_chat_context.py:81` | `await sessions.touch(principal.key)` |
 
@@ -496,7 +510,7 @@ mkdir src\adapters\base, src\adapters\telegram
   - `edit_message` → `bot.edit_message_text`，捕获 `TelegramAPIError` 翻译为 `MessageVanishedError`
   - `delete_message` → `bot.delete_message`
   - `send_media` → `bot.send_document` / `bot.send_photo`
-  - `begin_status` → `bot.send_message` 发占位 + `reply_markup`，返回 `MessageRef`
+  - `begin_status` → `bot.send_message` 发占位 + `reply_markup`，返回 `MessageRefDTO`
   - `finish_status` → `bot.edit_message_text` 改写占位为最终回答 + 完整键盘
   - `direct_to_user` → 正文内嵌 `tg://user?id=` 深链
   - `mention_fragment` → 返回 markdown 深链字符串
@@ -518,10 +532,12 @@ mkdir src\adapters\base, src\adapters\telegram
 
 ### 5.4 HandlerContext
 
-创建 `src/adapters/base/_context.py`：
+创建 `src/services/_context.py`：
 
 - `HandlerContext` frozen dataclass，字段按 `docs/refactor-design.md` 4.1 节。
 - `reply`、`answer`、`direct_to`、`mention_fragment`、`send_menu` 便捷方法委托给 `interaction` 端口。
+
+**它必须在 `services/` 而不是 `adapters/base/`**：handler 签名 `(event, ctx)` 要求插件 import `HandlerContext`，放适配层就撞上阶段 5 加的"plugins 不依赖 adapters"契约；放服务层则完全合法（插件本就允许依赖 core + services）。它持有的 `InteractionPort` 是 core 抽象，不引入任何 aiogram 依赖。
 
 ### 5.5 handler 签名改造
 
@@ -540,7 +556,7 @@ mkdir src\adapters\base, src\adapters\telegram
 创建 `src/adapters/telegram/_normalize.py`：
 
 - `normalize_update(update: Update) -> InboundEventDTO | None` 函数。
-- 从 `update.message` 提取 `Principal`、`ContentDTO`、`MessageRef`。
+- 从 `update.message` 提取 `PrincipalDTO`、`ContentDTO`、`MessageRefDTO`。
 - 解析命令：`message.text` 以 `/` 开头时设 `is_command=True`、`command_name`、`command_args`。
 - 解析回复：`message.reply_to_message` 非空时设 `reply_to`。
 - 解析提及：检测 `message.entities` 中的 `mention` / `text_mention`。

@@ -12,6 +12,12 @@
 - **数据层持久化与跨平台适配重构**：方案见 `docs/refactor-design.md`。会话与任务落 SQLite、内部对象改经 DTO 访问、aiogram 逻辑收拢进适配层并预留 QQ 接入，待确认后分阶段实施。
 - **重构操作手册**：阶段 0～6 的逐步执行清单见 `docs/refactor-operations.md`，含命令、文件改动与验证项。
 
+### 🔧 Changed
+
+- **规范新增 DTO 后缀与词表归层命名**：`core/dto` 类型一律 `DTO` 后缀，词表按变更范围定归属。
+- **重构方案移除会话级 md_ready**：渲染触发下沉到消息级（TG 按钮 / QQ 命令），产物按消息 ref 建索引；字段、补丁位、端口方法与 DDL 列同步删除。
+- **D10 定案**：思考过程砍展示、留记录，`MessageDTO` 与 `session_message` 表加 `reasoning` 字段，配套按消息查看命令。
+
 ---
 
 ## [1.0.0-alpha.2] - 2026-10-01

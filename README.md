@@ -1,4 +1,4 @@
-# Fool's Telegram Bot
+# FinshinImpact
 
 [![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Aiogram Version](https://img.shields.io/badge/aiogram-3.x-green.svg)](https://docs.aiogram.dev/)
@@ -6,7 +6,7 @@
 [![Project Type](https://img.shields.io/badge/project-pyproject.toml-brightgreen.svg)](pyproject.toml)
 [![Changelog](https://img.shields.io/badge/changelog-CHANGELOG.md-blue.svg)](CHANGELOG.md)
 
-> 一个基于 `Python` 和 `aiogram 3.x` 构建的异步 Telegram 机器人，采用模块化插件设计。
+> 一个基于 `Python` 和 `aiogram 3.x` 构建的异步机器人，采用模块化插件设计。
 >
 > **本项目仅限 `Windows` 用户使用。**
 

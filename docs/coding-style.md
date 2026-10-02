@@ -56,6 +56,8 @@
 - 门面最小导出：包门面只代发多消费方符号，单一或极少数消费者的符号不进门面，子模块转正（去 `_` 前缀），由调用方 `from package.module import symbol` 直连。
 - 包内互用走相对直连，不绕自家门面，防循环依赖回流。
 - 同源的散装模块级变量（常量、配置项、协议串）攒够三五件即收进命名空间类，不许裸变量持续堆积。
+- `core/dto` 类型一律 `DTO` 后缀（如 `PrincipalDTO`、`MessageRefDTO`）。
+- 词表按变更范围归层：与某 DTO 字段共变的进该 DTO 文件，横切适配层与存储的进 `core/domain`。
 - 同域成员不重复域前缀：类名或裸常量前缀已表达域义，成员只写语义本体——`RowStatus.SKIP` 不写成 `ROW_STATUS_SKIP`，`ConnectivityMessage.TIMEOUT` 不写成 `_CONNECTIVITY_TIMEOUT`。
 - 域与域靠语义区分，格式全文件一致：域外可见的裸常量一律 `DOMAIN_MEANING[_UNIT]`（如 `PUSH_MAX_RETRIES`、`CONNECT_TIMEOUT_MS`），私有加 `_` 前缀（如 `_PUSH_MAX_RETRIES`），禁止混用其他样式。
 

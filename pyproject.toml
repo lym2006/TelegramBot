@@ -9,7 +9,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [project]
-name = "asyncbot"
+name = "finshin-impact"
 version = "1.0.0-alpha.2"
 description = "一个基于 aiogram 的机器人"
 requires-python = ">=3.11,<4.0"

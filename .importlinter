@@ -1,10 +1,22 @@
 [importlinter]
-root_package = src
+root_packages =
+    core
+    data
+    services
+    adapters
+    plugins
+    utils
+    bot
+    exceptions
+    gui
+    messages
+include_external_packages = True
 
 [importlinter:contract:core-zero-deps]
-name = core 零外部依赖
+name = core zero external dependencies
 type = forbidden
-source_modules = src.core
+source_modules =
+    core
 forbidden_modules =
     aiogram
     PySide6
@@ -17,30 +29,18 @@ forbidden_modules =
     cv2
     numpy
 
-[importlinter:contract:services-pure]
-name = services 不依赖 data 与 adapters
-type = forbidden
-source_modules = src.services
-forbidden_modules =
-    src.data
-    src.adapters
-
-[importlinter:contract:plugins-no-sdk]
-name = plugins 不依赖平台 SDK
-type = forbidden
-source_modules = src.plugins
-forbidden_modules =
-    aiogram
-    src.adapters
-
 [importlinter:contract:data-adapters-isolation]
-name = data 与 adapters 互不知晓
+name = data and adapters isolation
 type = forbidden
-source_modules = src.data
-forbidden_modules = src.adapters
+source_modules =
+    data
+forbidden_modules =
+    adapters
 
-[importlinter:contract:adapters-no-data]
-name = adapters 不依赖 data
-type = forbidden
-source_modules = src.adapters
-forbidden_modules = src.data
+[importlinter:contract:core-layers]
+name = core internal layers
+type = layers
+layers =
+    core.ports
+    core.dto
+    core.domain

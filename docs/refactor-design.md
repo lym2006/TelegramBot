@@ -110,7 +110,7 @@
 5. 上层可依赖下层，反向禁止。`core/` 是唯一被所有层依赖的底座。
 6. 跨层通信只走 DTO，禁止把 `data/` 的行对象或 `adapters/` 的平台对象传到 `services/` 之上。
 
-违规由 import-linter 契约在阶段 0 起机器拦截，不靠人工 review。
+违规由 import-linter 契约机器拦截，不靠人工 review。契约按阶段渐进添加：每条契约在它所约束的层落地时才进配置，阶段 0 只上"core 零外部依赖"与"data 与 adapters 互不知晓"两条（详见操作手册 0.4），避免对未迁移代码全量豁免或误报刷屏。
 
 ### 2.2 目录结构建议
 
@@ -120,10 +120,9 @@
 src/
 ├── core/                        平台与存储双无关的底座
 │   ├── __init__.py
-│   ├── errors.py                领域异常（跨层流通）
 │   ├── dto/                     只读数据契约
 │   │   ├── __init__.py          门面，导出全部 *DTO
-│   │   ├── _identity.py         PrincipalDTO / MessageRef
+│   │   ├── _identity.py         PrincipalDTO / MessageRefDTO
 │   │   ├── _event.py            InboundEventDTO / CallbackEventDTO
 │   │   ├── _content.py          ContentDTO / ContentKind
 │   │   ├── _session.py          SessionDTO / MessageDTO
@@ -171,6 +170,7 @@ src/
 │   │   └── _handlers/           chat / history / clear / md
 │   ├── _media.py                MediaIndexService
 │   ├── _blacklist.py            取代现有文件态实现
+│   ├── _context.py              HandlerContext 组装
 │   └── ai/                      现有 AI 客户端与渲染迁入
 │       ├── _client.py
 │       └── _render/
@@ -180,7 +180,6 @@ src/
 │   ├── base/                    跨平台共用实现
 │   │   ├── _middleware.py       EventPipeline，平台无关中间件链
 │   │   ├── _access_log.py       访问日志中间件（现 LoggingMiddleware 去平台化）
-│   │   ├── _context.py          HandlerContext 组装
 │   │   ├── _plugin_loader.py    PluginSpec 加载与逐项报告
 │   │   ├── _router_bridge.py    平台无关指令 → 平台路由的编译
 │   │   ├── _degrade.py          交互降级策略表
@@ -218,7 +217,7 @@ src/
 │
 ├── gui/                         骨架不动，仅数据来源换成 DTO
 ├── messages/                    不动，继续收敛 GUI 文案
-├── exceptions/                  保留，领域异常另放 core/errors.py
+├── exceptions/                  保留体系，新增 _domain.py 领域异常族
 └── utils/                       平台无关工具，middleware 与 plugins_register 迁出
 ```
 
@@ -275,7 +274,7 @@ class ChatScope:
 # src/core/dto/_identity.py
 
 @dataclass(frozen=True, slots=True)
-class Principal:
+class PrincipalDTO:
     """会话主体标识
 
     - 取代现 get_name 的字符串拼接方案
@@ -296,7 +295,7 @@ class Principal:
 
 `chat_id` / `user_id` 一律 `str`。QQ 号与 Telegram ID 都能塞进 int，但 OneBot 的群号在部分实现里带前缀，且字符串化后跨平台拼接不会溢出，DB 列类型也统一。
 
-`Principal.key` 的格式是 `f"{platform}:{scope}:{chat_id}:{user_id}"`，四段定长分隔，任何一段为空补 `-`。私聊场景 `chat_id == user_id`，仍保留两段以保证格式统一、解析侧无分支。
+`PrincipalDTO.key` 的格式是 `f"{platform}:{scope}:{chat_id}:{user_id}"`，四段定长分隔，任何一段为空补 `-`。私聊场景 `chat_id == user_id`，仍保留两段以保证格式统一、解析侧无分支。
 
 ### 3.2 事件与内容 DTO
 
@@ -330,14 +329,14 @@ class ContentDTO:
     file_name: str = ""
     file_token: str = ""        # 平台侧文件标识，惰性下载
     image_count: int = 0
-    raw_ref: MessageRef | None = None
+    raw_ref: MessageRefDTO | None = None
 ```
 
 ```python
 # src/core/dto/_identity.py
 
 @dataclass(frozen=True, slots=True)
-class MessageRef:
+class MessageRefDTO:
     """消息定位四元组
 
     - 图片定位接口的寻址依据
@@ -363,13 +362,13 @@ class InboundEventDTO:
     - 中间件与业务层的唯一事件输入
     """
 
-    ref: MessageRef
-    principal: Principal
+    ref: MessageRefDTO
+    principal: PrincipalDTO
     content: ContentDTO
     is_command: bool = False
     command_name: str = ""
     command_args: tuple[str, ...] = ()
-    reply_to: MessageRef | None = None
+    reply_to: MessageRefDTO | None = None
     is_mention_bot: bool = False
     created_at: float = 0.0
     display_name: str = ""
@@ -382,11 +381,11 @@ class CallbackEventDTO:
     - TG 内联按键与 QQ 引用回复命令归一到此
     """
 
-    ref: MessageRef
-    principal: Principal
+    ref: MessageRefDTO
+    principal: PrincipalDTO
     action_id: str
     payload: tuple[tuple[str, str], ...] = ()   # 有序键值对，保持 frozen
-    source_message: MessageRef | None = None   # 被引用的菜单消息
+    source_message: MessageRefDTO | None = None   # 被引用的菜单消息
 ```
 
 `CallbackEventDTO` 是目标 2.3 与 2.4 的汇合点：TG 的 `callback_query` 和 QQ 的"引用菜单消息回复序号"最终都归一成这个 DTO，业务层写一份 `handle_callback` 即可。
@@ -405,6 +404,7 @@ class MessageDTO:
 
     role: str                   # system / user / assistant
     content: str
+    reasoning: str = ""         # 思考过程，history_for_model 转换时丢弃
     created_at: float = 0.0
 
 
@@ -415,10 +415,9 @@ class SessionDTO:
     - 只读投影，禁止原地修改
     """
 
-    principal: Principal
+    principal: PrincipalDTO
     messages: tuple[MessageDTO, ...] = ()
     is_active: bool = False
-    md_ready: bool = False      # 对应现 md_status
     last_active: float = 0.0
 
 
@@ -431,7 +430,6 @@ class SessionPatchDTO:
 
     append: tuple[MessageDTO, ...] = ()
     reset_to_system: bool = False
-    md_ready: bool | None = None    # None 表示不改
 ```
 
 现有 `UserSession.message` 是 `list[dict[str, str]]`，直接喂给 AI 客户端。改造后 `SessionDTO.messages` 是 `tuple[MessageDTO, ...]`，`services/ai/_client.py` 内部再转成 API 需要的 dict 列表——转换点收在客户端一处，不散落到业务层。
@@ -448,9 +446,7 @@ class TaskKind:
     CHAT: ClassVar[str] = "chat"
     HISTORY_EXPORT: ClassVar[str] = "history_export"
     CONTEXT_CLEAR: ClassVar[str] = "context_clear"
-    CONTEXT_SUMMARY: ClassVar[str] = "context_summary"
     MD_RENDER: ClassVar[str] = "md_render"
-    MEDIA_LOCATE: ClassVar[str] = "media_locate"
 
 
 class TaskStatus:
@@ -472,7 +468,7 @@ class TaskPriority:
     IMMEDIATE: ClassVar[int] = 0    # 控制类命令：清队、停止
     HIGH: ClassVar[int] = 10        # 查询类：history、md
     NORMAL: ClassVar[int] = 50      # 普通对话
-    LOW: ClassVar[int] = 90         # 后台任务：记录导出、媒体索引
+    LOW: ClassVar[int] = 90         # 后台任务：记录导出等
 ```
 
 ```python
@@ -483,12 +479,12 @@ class TaskDTO:
     """任务只读视图"""
 
     task_id: str
-    principal: Principal
+    principal: PrincipalDTO
     kind: str
     status: str
     priority: int
-    source_ref: MessageRef | None = None
-    status_ref: MessageRef | None = None    # 对应现 status_id
+    source_ref: MessageRefDTO | None = None
+    status_ref: MessageRefDTO | None = None    # 对应现 status_id
     payload: tuple[tuple[str, str], ...] = ()
     error_text: str = ""
     created_at: float = 0.0
@@ -503,9 +499,9 @@ class TaskRequestDTO:
     - enqueue 的唯一入参
     """
 
-    principal: Principal
+    principal: PrincipalDTO
     kind: str
-    source_ref: MessageRef | None = None
+    source_ref: MessageRefDTO | None = None
     content: ContentDTO | None = None
     priority: int = TaskPriority.NORMAL
     payload: tuple[tuple[str, str], ...] = ()
@@ -520,13 +516,13 @@ class TaskPatchDTO:
     """
 
     status: str | None = None
-    status_ref: MessageRef | None = None
+    status_ref: MessageRefDTO | None = None
     priority: int | None = None
     error_text: str | None = None
     finished_at: float | None = None
 ```
 
-`TaskDTO` 与现 `TaskItem` 的对应关系：`chat_id` / `ori_id` / `type_` 三个字段收进 `principal`；`message: Message` 换成 `source_ref: MessageRef`；`status_id` 换成 `status_ref`；`draft_id` 与 `last_draft_time` 属 TG 私有的草稿机制，不进 DTO，留在 `adapters/telegram/_interaction.py` 内部状态里。
+`TaskDTO` 与现 `TaskItem` 的对应关系：`chat_id` / `ori_id` / `type_` 三个字段收进 `principal`；`message: Message` 换成 `source_ref: MessageRefDTO`；`status_id` 换成 `status_ref`；`draft_id` 与 `last_draft_time` 属 TG 私有的草稿机制，不进 DTO，留在 `adapters/telegram/_interaction.py` 内部状态里。
 
 ### 3.4 端口抽象
 
@@ -540,36 +536,36 @@ class InteractionPort(ABC):
     """
 
     @abstractmethod
-    async def send_text(self, principal: Principal, text: str) -> MessageRef | None:
+    async def send_text(self, principal: PrincipalDTO, text: str) -> MessageRefDTO | None:
         """发送文本"""
 
     @abstractmethod
     async def reply_to_message(
-        self, target: MessageRef, text: str
-    ) -> MessageRef | None:
+        self, target: MessageRefDTO, text: str
+    ) -> MessageRefDTO | None:
         """回复指定消息"""
 
     @abstractmethod
-    async def edit_message(self, target: MessageRef, text: str) -> bool:
+    async def edit_message(self, target: MessageRefDTO, text: str) -> bool:
         """编辑已发消息
 
         - 不支持或失败返回 False，调用方决定降级
         """
 
     @abstractmethod
-    async def delete_message(self, target: MessageRef) -> bool:
+    async def delete_message(self, target: MessageRefDTO) -> bool:
         """删除消息"""
 
     @abstractmethod
     async def send_media(
-        self, principal: Principal, payload: OutboundMedia
-    ) -> MessageRef | None:
+        self, principal: PrincipalDTO, payload: OutboundMedia
+    ) -> MessageRefDTO | None:
         """发送图片文档等媒体"""
 
     @abstractmethod
     async def send_inline_menu(
-        self, principal: Principal, spec: MenuSpecDTO
-    ) -> MessageRef | None:
+        self, principal: PrincipalDTO, spec: MenuSpecDTO
+    ) -> MessageRefDTO | None:
         """发送内联菜单
 
         - 无能力时由 Adapter 降级为引用回复命令
@@ -577,8 +573,8 @@ class InteractionPort(ABC):
 
     @abstractmethod
     async def direct_to_user(
-        self, principal: Principal, target: MessageRef | None, text: str
-    ) -> MessageRef | None:
+        self, principal: PrincipalDTO, target: MessageRefDTO | None, text: str
+    ) -> MessageRefDTO | None:
         """定向投递给某用户
 
         - TG 用 markdown 深链提及，正文自带可点击用户名
@@ -587,7 +583,7 @@ class InteractionPort(ABC):
         """
 
     @abstractmethod
-    def mention_fragment(self, principal: Principal, user_id: str) -> str:
+    def mention_fragment(self, principal: PrincipalDTO, user_id: str) -> str:
         """生成提及文本片段
 
         - TG 返回 markdown 深链，可嵌进长文本
@@ -597,8 +593,8 @@ class InteractionPort(ABC):
 
     @abstractmethod
     async def begin_status(
-        self, principal: Principal, text: str, spec: MenuSpecDTO | None = None
-    ) -> MessageRef | None:
+        self, principal: PrincipalDTO, text: str, spec: MenuSpecDTO | None = None
+    ) -> MessageRefDTO | None:
         """发起状态占位消息
 
         - 可编辑平台发出占位并返回 ref，供后续原地改写为结果
@@ -608,9 +604,9 @@ class InteractionPort(ABC):
 
     @abstractmethod
     async def finish_status(
-        self, ref: MessageRef | None, principal: Principal, text: str,
+        self, ref: MessageRefDTO | None, principal: PrincipalDTO, text: str,
         spec: MenuSpecDTO | None = None,
-    ) -> MessageRef | None:
+    ) -> MessageRefDTO | None:
         """收尾状态消息
 
         - ref 非空则编辑该消息，为空则新发一条
@@ -618,7 +614,7 @@ class InteractionPort(ABC):
         """
 
     @abstractmethod
-    async def probe_exists(self, target: MessageRef) -> bool:
+    async def probe_exists(self, target: MessageRefDTO) -> bool:
         """探测消息是否仍存在
 
         - 取代现有 is_deleted 的 dummy 编辑探测
@@ -671,7 +667,7 @@ class PrincipalRepository(ABC):
     """会话主体仓储"""
 
     @abstractmethod
-    async def upsert(self, principal: Principal, display_name: str) -> PrincipalDTO:
+    async def upsert(self, principal: PrincipalDTO, display_name: str) -> PrincipalDTO:
         """写入或更新主体"""
 
     @abstractmethod
@@ -750,11 +746,11 @@ class MediaRepository(ABC):
     """
 
     @abstractmethod
-    async def register(self, ref: MessageRef, entry: MediaEntryDTO) -> None:
+    async def register(self, ref: MessageRefDTO, entry: MediaEntryDTO) -> None:
         """登记一条媒体索引"""
 
     @abstractmethod
-    async def locate(self, ref: MessageRef) -> tuple[MediaEntryDTO, ...]:
+    async def locate(self, ref: MessageRefDTO) -> tuple[MediaEntryDTO, ...]:
         """按四元组定位媒体
 
         - 目标 1.3 的落点
@@ -888,7 +884,9 @@ class TaskQueuePort(ABC):
 ### 4.1 处理上下文
 
 ```python
-# src/adapters/base/_context.py
+# src/services/_context.py
+# 归置在 services 而非 adapters：插件 import HandlerContext 属合法的服务层依赖，
+# 放适配层会撞"plugins 不依赖 adapters"契约
 
 @dataclass(frozen=True, slots=True)
 class HandlerContext:
@@ -904,13 +902,13 @@ class HandlerContext:
     media: MediaIndexService
     principal: PrincipalDTO
 
-    async def reply(self, text: str) -> MessageRef | None:
+    async def reply(self, text: str) -> MessageRefDTO | None:
         """回复当前事件"""
 
-    async def answer(self, text: str) -> MessageRef | None:
+    async def answer(self, text: str) -> MessageRefDTO | None:
         """主动发送到当前会话"""
 
-    async def direct_to(self, user_id: str, text: str) -> MessageRef | None:
+    async def direct_to(self, user_id: str, text: str) -> MessageRefDTO | None:
         """定向投递给某用户
 
         - TG 正文内嵌提及深链，QQ 走引用回复
@@ -923,7 +921,7 @@ class HandlerContext:
         - QQ 返回纯用户名
         """
 
-    async def send_menu(self, spec: MenuSpecDTO) -> MessageRef | None:
+    async def send_menu(self, spec: MenuSpecDTO) -> MessageRefDTO | None:
         """发送交互菜单
 
         - 无能力时自动走降级通路
@@ -991,9 +989,6 @@ class SessionService:
     async def touch(self, key: str) -> None:
         """刷新活跃时间"""
 
-    async def set_md_ready(self, key: str, ready: bool) -> None:
-        """标记可渲染图片"""
-
     async def purge_stale(self) -> int:
         """清理失活会话
 
@@ -1002,6 +997,8 @@ class SessionService:
 ```
 
 `session_guard` 装饰器退役。它的两件事（初始化会话、初始化队列）分别由 `SessionPreload` 中间件与 `TaskService.enqueue` 内部承担，不再需要每个 handler 手动挂装饰器——现有代码里 `_history.py:33,52,66` 三处重复挂载、`_identity.py:76,116` 选择性挂载的不一致也随之消失。
+
+Markdown 渲染不设会话级标记：旧 `md_status` 随本层删除，渲染触发下沉到消息级——worker 收尾时按回复文本判含码则挂渲染按钮（TG）或接受 md 命令（QQ），产物以消息 ref 为全局键存渲染索引，命中直返图片、未中现渲。
 
 ### 4.4 TaskService
 
@@ -1099,7 +1096,7 @@ class AdapterCapability:
 | `mention_fragment` | markdown 深链，可嵌长文本 | 纯用户名，因引用是发送方式、无法内嵌 |
 | `begin_status` | 发「正在思考中」占位并返回 ref | **不发占位**，返回 `None`，避免发了又必须撤回 |
 | `finish_status` | 把占位原地编辑为最终回答 | ref 为 `None`，直接新发一条最终回答 |
-| `edit_message` | 直接编辑 | 撤回后重发，`degraded` 置真，返回新的 `MessageRef`。QQ 侧因不发占位而极少触发 |
+| `edit_message` | 直接编辑 | 撤回后重发，`degraded` 置真，返回新的 `MessageRefDTO`。QQ 侧因不发占位而极少触发 |
 | `send_document` | 原生文件 | 转图片长图或分片文本 |
 
 提及之所以拆成 `direct_to_user` 与 `mention_fragment` 两个方法：TG 的提及是**文本片段**（深链可嵌进任意长文本），QQ 的提及是**发送方式**（靠引用某条消息），二者形态不同，硬塞进一个返回字符串的方法里表达不了。拆开后 TG 走片段、QQ 走投递，`_identity.py:41-50` 的 `_make_mention` 深链拼装移入 TG Adapter，业务层只声明"要说给这个人听"。
@@ -1152,7 +1149,7 @@ send_inline_menu(spec)
 
 **③ 记录仍要 `reasoning_content`。** `_save_conversation_record`（`_worker.py:61`）把 `final_think` 写进 txt/md，`/history` 发给用户的正是该文件。只要记录保留思考内容，解析循环就得留着。
 
-> 待定项 D10：`reasoning_content` 是只砍展示、仍写入记录，还是连记录一起砍。前者 `/history` 导出内容不变，后者 `_handle_ai_message` 只留 `content` 分支。
+> D10 定案（2026-10-02，用户）：只砍展示、仍写入记录。`/history` 导出内容不变，思考过程另提供查看命令按消息读取。
 
 #### 4.6.3 两端最终形态
 
@@ -1263,7 +1260,7 @@ class TaskPriority:
     IMMEDIATE: ClassVar[int] = 0     # 控制类：清队、停止
     HIGH: ClassVar[int] = 10         # 命令类：/history /clear /md
     NORMAL: ClassVar[int] = 50       # 普通对话
-    LOW: ClassVar[int] = 90          # 后台：记录导出、媒体索引重建
+    LOW: ClassVar[int] = 90          # 后台：记录导出等
 ```
 
 三个队列操作的语义边界：
@@ -1280,9 +1277,9 @@ class TaskPriority:
 
 | 原成员 | 去向 |
 | :--- | :--- |
-| `message: Message` | 删除，换成 `TaskDTO.source_ref: MessageRef` |
-| `chat_id` / `ori_id` / `type_` | 收进 `Principal` |
-| `status_id` | `TaskDTO.status_ref: MessageRef` |
+| `message: Message` | 删除，换成 `TaskDTO.source_ref: MessageRefDTO` |
+| `chat_id` / `ori_id` / `type_` | 收进 `PrincipalDTO` |
+| `status_id` | `TaskDTO.status_ref: MessageRefDTO` |
 | `draft_id` / `last_draft_time` | **删除**，展示流式已砍除（4.6） |
 | `bot: Bot` | 删除，Adapter 私有 |
 | `is_deleted()` | `InteractionPort.probe_exists()` |
@@ -1402,8 +1399,7 @@ principal(
     display_name   TEXT NOT NULL DEFAULT '',
     created_at     REAL NOT NULL,
     last_active_at REAL NOT NULL DEFAULT 0,
-    is_active      INTEGER NOT NULL DEFAULT 0,
-    md_ready       INTEGER NOT NULL DEFAULT 0
+    is_active      INTEGER NOT NULL DEFAULT 0
 )
 INDEX idx_principal_platform ON principal(platform)
 INDEX idx_principal_stale    ON principal(last_active_at, is_active)
@@ -1415,6 +1411,7 @@ session_message(
     seq         INTEGER NOT NULL,        -- 会话内序号，保证顺序
     role        TEXT NOT NULL,           -- system / user / assistant
     content     TEXT NOT NULL,
+    reasoning   TEXT NOT NULL DEFAULT '',
     created_at  REAL NOT NULL
 )
 UNIQUE idx_message_seq ON session_message(principal, seq)
@@ -1428,8 +1425,8 @@ task(
     sequence     INTEGER NOT NULL,
     status       TEXT NOT NULL,          -- pending/running/succeeded/failed/cancelled
     payload      TEXT NOT NULL DEFAULT '{}',   -- JSON
-    source_ref   TEXT,                   -- JSON: MessageRef
-    status_ref   TEXT,                   -- JSON: MessageRef
+    source_ref   TEXT,                   -- JSON: MessageRefDTO
+    status_ref   TEXT,                   -- JSON: MessageRefDTO
     dedupe_key   TEXT NOT NULL DEFAULT '',
     error        TEXT NOT NULL DEFAULT '',
     created_at   REAL NOT NULL,
@@ -1716,7 +1713,7 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 | D7 | 迁移激进程度 | **新旧并存，插件逐个迁** | 每阶段可独立运行与回滚，加载器兼容旧 `router` 契约；一次切换出问题定位面大 |
 | D8 | 思考过程展示 | **整体砍除**，两端静默等待后输出最终回答，draft 机制退役 | 用户 2026-10-01 决定。砍除后两端行为差异收敛为一处（发不发占位消息），由 `EDIT_MESSAGE` 单个能力位覆盖，不再需要 draft、节流、分档等机制。删除清单见 4.6.4 |
 | D9 | 传输流式（SSE） | **保留**，`stream_chat` 两端共用不改 | 与界面无关，是程序与 AI 服务商之间的 HTTP 行为。保留理由三条：`read` 超时语义（流式下不会误杀长回答）、取消能力依赖 `async for` 提前 break、记录仍需 `reasoning_content`。详见 4.6.2 |
-| D10 | `reasoning_content` 去向 | **待定** | 只砍展示则仍写入记录、`/history` 导出内容不变；连记录一起砍则 `_handle_ai_message` 只留 `content` 分支、`/history` 里不再有思考过程。两者工作量都小 |
+| D10 | `reasoning_content` 去向 | **砍展示、留记录** | 用户 2026-10-02 定案：思考过程随消息持久化（`MessageDTO` 加 `reasoning` 字段、`session_message` 表加列），`/history` 导出内容不变，另提供按消息查看思考过程的命令；`history_for_model` 转换时丢弃，不喂模型 |
 
 ## 七、分步实施路线
 
@@ -1724,13 +1721,13 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 **阶段 0 · 护栏**
 
-引入 import-linter 分层契约，先把现有代码的违规项列成豁免清单（不改代码），后续每阶段消掉一批。装 aiosqlite。
+引入 import-linter，契约配置放项目根 `.importlinter`（INI），按阶段渐进启用：阶段 0 只上 "core zero external dependencies" 与 "data and adapters isolation" 两条（空壳包天然通过、零误报），后续每阶段随对应层落地再追加。未迁移代码不写死契约，也就无需豁免清单。装 aiosqlite。
 
-验证：契约检查跑通，豁免清单条目数已知。
+验证：项目根跑 lint-imports，输出 2 kept、0 broken。三个实操要点见操作手册 0.4：include_external_packages 开关不能少（forbidden 里有 aiogram 时缺它直接报错退出）；INI 必须存为 UTF-8 无 BOM（BOM 让 configparser 报 no section headers）；契约名用英文可彻底摆脱对 PYTHONUTF8 的依赖。
 
 **阶段 1 · core 层落地**
 
-建 `core/dto/`、`core/domain/`、`core/ports/`、`core/errors.py` 全量定义。此阶段不接任何业务，纯类型与抽象。
+建 `core/dto/`、`core/domain/`、`core/ports/` 全量定义，另在 `exceptions/` 下新增 `_domain.py` 领域异常族（继承现有 `AIError`，复用 `BotError` 基类，不建第二套异常树）。此阶段不接任何业务，纯类型与抽象。
 
 验证：`core/` 不出现 aiogram / PySide6 / aiosqlite 导入；mypy 或 pyright 严格模式过。
 
@@ -1742,7 +1739,7 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 **阶段 3 · Principal 切换（P0 优先）**
 
-引入 `Principal`，替换 `get_name()` 全部调用点。写 `_0002_legacy_import`，把黑名单 txt、会话记录文件导入新表。
+引入 `PrincipalDTO`，替换 `get_name()` 全部调用点。写 `_0002_legacy_import`，把黑名单 txt、会话记录文件导入新表。
 
 验证：旧 key → 新 key 映射逐条比对；导入幂等（跑两次结果一致）；旧文件已加 `.migrated` 后缀且未删除。
 
@@ -1806,8 +1803,8 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 第一次动手做这三件事，顺序固定，做完即有一个能跑的地基，不碰任何现有业务逻辑：
 
-1. **阶段 0**：`pyproject.toml` 加 `aiosqlite`，装 import-linter，写分层契约。此时先把现有代码全部列进豁免清单，契约跑通即可，不改一行业务代码。
-2. **阶段 1**：建 `core/dto/`、`core/domain/`、`core/ports/`、`core/errors.py`，全部是类型与抽象基类，无实现、无第三方导入。这一步纯写"骨架"，写完用 pyright 严格模式过一遍。
+1. **阶段 0**：`pyproject.toml` 加 `aiosqlite`，装 import-linter，在项目根 `.importlinter` 写两条契约（core zero external deps、data and adapters isolation，后续阶段随层落地再追加，不搞全量豁免）。契约不进 `pyproject.toml`，开发工具配置独立成文件。此阶段不改一行业务代码。
+2. **阶段 1**：建 `core/dto/`、`core/domain/`、`core/ports/`，另在 `exceptions/` 下新增 `_domain.py`（继承现有 `AIError`，复用 `BotError`，不建第二套异常树）。全部是类型与抽象基类，无实现、无第三方导入。写完用 pyright 严格模式过一遍。
 3. **阶段 2**：建 `data/_sqlite/`，实现各 Repository 与 `_0001_baseline` 建表。写一次性脚本验证 CRUD、事务回滚、状态机非法转移拒绝。
 
 这三步的共同点是**只加新文件、不改旧文件**，所以做完项目仍能正常启动运行，风险为零。真正的"破坏性"改动从阶段 3 才开始。
@@ -1847,7 +1844,7 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 | **UnitOfWork（工作单元）** | 把多个数据库操作打包成一个事务，要么全成要么全滚 | 清理会话要同时删 4 张表，现有 `_monitor.py:119` 的 unlink 三连没有事务，删一半失败就留孤儿文件。UnitOfWork 解决这个 |
 | **WAL** | SQLite 的一种日志模式，让"读"和"写"不打架，读写可并发 | 默认模式下写库时读库会被阻塞；开 WAL 后 GUI 面板查队列和后台写任务能同时进行。一行 `PRAGMA journal_mode=WAL` 开启 |
 | **落盘 / 入库** | 落盘=写成文件存硬盘；入库=写进数据库 | 对话记录（txt/md/png）是"落盘"；会话、任务、黑名单改造后是"入库" |
-| **Principal（主体）** | 唯一标识"哪个平台的哪个会话里的哪个用户" | 现有 `get_name` 产出 `u_123`，缺平台维度。`Principal` 补全为 `telegram:private:123:123`，QQ 用户就不会和 TG 用户撞号 |
+| **Principal（主体）** | 唯一标识"哪个平台的哪个会话里的哪个用户" | 现有 `get_name` 产出 `u_123`，缺平台维度。`PrincipalDTO` 补全为 `telegram:private:123:123`，QQ 用户就不会和 TG 用户撞号 |
 | **能力协商** | 运行时先问"这平台支持 X 吗"，不支持就走降级 | `supports(EDIT_MESSAGE)` 在 QQ 返回 False，思考态就自动改走"撤回重发"而非"原地编辑" |
 | **降级** | 高级能力不可用时，退而求其次用低级能力达到近似效果 | 内联键盘 QQ 不支持，降级成"编号文本 + 引用回复序号" |
 
@@ -1866,4 +1863,4 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 - MySQL Repository 实现（只保证接口可承载）。
 - OneBot v11 之外的协议版本（NapCat / Lagrange 等实现差异在 `_api.py` 内部消化）。
 - GUI 面板的队列可视化（`TaskService.snapshot` 已备好数据，界面后续做）。
-- 上下文压缩（`TaskKind.CONTEXT_SUMMARY` 已占位）。
+- 上下文压缩（实现时再登记对应 `TaskKind` 值，本轮不占位）。
