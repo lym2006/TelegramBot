@@ -1,0 +1,46 @@
+[importlinter]
+root_package = src
+
+[importlinter:contract:core-zero-deps]
+name = core 零外部依赖
+type = forbidden
+source_modules = src.core
+forbidden_modules =
+    aiogram
+    PySide6
+    aiosqlite
+    httpx
+    playwright
+    tenacity
+    markdown
+    PIL
+    cv2
+    numpy
+
+[importlinter:contract:services-pure]
+name = services 不依赖 data 与 adapters
+type = forbidden
+source_modules = src.services
+forbidden_modules =
+    src.data
+    src.adapters
+
+[importlinter:contract:plugins-no-sdk]
+name = plugins 不依赖平台 SDK
+type = forbidden
+source_modules = src.plugins
+forbidden_modules =
+    aiogram
+    src.adapters
+
+[importlinter:contract:data-adapters-isolation]
+name = data 与 adapters 互不知晓
+type = forbidden
+source_modules = src.data
+forbidden_modules = src.adapters
+
+[importlinter:contract:adapters-no-data]
+name = adapters 不依赖 data
+type = forbidden
+source_modules = src.adapters
+forbidden_modules = src.data
