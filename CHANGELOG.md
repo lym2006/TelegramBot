@@ -9,6 +9,8 @@
 ### 📝 Planned
 
 - **热重启做成弹窗**：重启服务等耗时操作接入通用转圈壳，届时 WaitDialog 获得第二个用户、Version 专属命名再议。
+- **数据层持久化与跨平台适配重构**：方案见 `docs/refactor-design.md`。会话与任务落 SQLite、内部对象改经 DTO 访问、aiogram 逻辑收拢进适配层并预留 QQ 接入，待确认后分阶段实施。
+- **重构操作手册**：阶段 0～6 的逐步执行清单见 `docs/refactor-operations.md`，含命令、文件改动与验证项。
 
 ---
 
