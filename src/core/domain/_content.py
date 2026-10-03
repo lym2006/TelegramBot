@@ -16,4 +16,5 @@ class ContentKind(StrEnum):
     AUDIO = "audio"
     VOICE = "voice"
     ANIMATION = "animation"
+    VIDEO = "video"
     UNKNOWN = "unknown"

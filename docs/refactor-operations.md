@@ -157,9 +157,9 @@ mkdir src\core\dto, src\core\domain, src\core\ports
 | `src/core/dto/_event.py` | 3.2 | `InboundEventDTO`、`CallbackEventDTO` |
 | `src/core/dto/_session.py` | 3.3 | `MessageDTO`、`SessionDTO`、`SessionPatchDTO` |
 | `src/core/dto/_task.py` | 3.3 | `TaskDTO`、`TaskRequestDTO`、`TaskPatchDTO` |
-| `src/core/dto/_interaction.py` | 3.2 | `OutboundMedia`、`MenuSpecDTO`、`MenuActionDTO` |
+| `src/core/dto/_interaction.py` | 3.2 | `OutboundContentDTO`、`MenuSpecDTO`、`MenuActionDTO` |
 | `src/core/ports/__init__.py` | — | 空门面 |
-| `src/core/ports/_adapter.py` | 3.4 | `InteractionPort`、`BaseAdapter`（含 `begin_status`/`finish_status`，不含 `show_thinking`） |
+| `src/core/ports/_adapter.py` | 3.4 | `InteractionPort`、`BaseAdapter`（含 `send_status`，不含 `show_thinking`） |
 | `src/core/ports/_repository.py` | 3.4 | 六个 Repository 抽象 + `UnitOfWork` |
 | `src/core/ports/_queue.py` | 3.5 | `TaskQueuePort` |
 | `src/core/ports/_store.py` | 3.4 | `ConversationStateStore` |
@@ -505,18 +505,12 @@ mkdir src\adapters\base, src\adapters\telegram
 - `TelegramInteractionPort(InteractionPort)` 类。
 - 构造函数接收 `aiogram.Bot`。
 - 实现全部端口方法：
-  - `send_text` → `bot.send_message`
-  - `reply_to_message` → `bot.send_message(reply_to_message_id=...)`
+  - `send_message` → 按 `content.kind` 分派 `bot.send_message` / `bot.send_photo` / `bot.send_document` 等，预览家族超限降级原样发送，`reply_ref` 非空时传 `reply_to_message_id`，`mention` 为真时前置深链，`spec` 非空时挂 `reply_markup`
   - `edit_message` → `bot.edit_message_text`，捕获 `TelegramAPIError` 翻译为 `MessageVanishedError`
   - `delete_message` → `bot.delete_message`
-  - `send_media` → `bot.send_document` / `bot.send_photo`
-  - `begin_status` → `bot.send_message` 发占位 + `reply_markup`，返回 `MessageRefDTO`
-  - `finish_status` → `bot.edit_message_text` 改写占位为最终回答 + 完整键盘
-  - `direct_to_user` → 正文内嵌 `tg://user?id=` 深链
+  - `probe_existence` → 用 `bot.get_chat` 或轻量 API 探测，**不再用 dummy edit**
+  - `send_status` → 发占位并引用 `reply_ref`，`spec` 非空时挂 `reply_markup`，返回占位 ref
   - `mention_fragment` → 返回 markdown 深链字符串
-  - `probe_exists` → 用 `bot.get_chat` 或轻量 API 探测，**不再用 dummy edit**
-  - `send_inline_menu` → 本轮只留骨架，返回 `None`
-  - `send_document` → `bot.send_document`
 
 关键：原 `TelegramTaskItem` 里的 `TelegramAPIError` 字符串匹配（`"message to edit not found"` 等）全部下沉到此文件，翻译成 `MessageVanishedError` / `TaskAbortedError`。业务层再也见不到平台异常类型。
 
@@ -535,7 +529,7 @@ mkdir src\adapters\base, src\adapters\telegram
 创建 `src/services/_context.py`：
 
 - `HandlerContext` frozen dataclass，字段按 `docs/refactor-design.md` 4.1 节。
-- `reply`、`answer`、`direct_to`、`mention_fragment`、`send_menu` 便捷方法委托给 `interaction` 端口。
+- `reply`、`answer`、`direct_to`、`mention_fragment` 便捷方法委托给 `interaction` 端口。
 
 **它必须在 `services/` 而不是 `adapters/base/`**：handler 签名 `(event, ctx)` 要求插件 import `HandlerContext`，放适配层就撞上阶段 5 加的"plugins 不依赖 adapters"契约；放服务层则完全合法（插件本就允许依赖 core + services）。它持有的 `InteractionPort` 是 core 抽象，不引入任何 aiogram 依赖。
 
@@ -558,7 +552,7 @@ mkdir src\adapters\base, src\adapters\telegram
 - `normalize_update(update: Update) -> InboundEventDTO | None` 函数。
 - 从 `update.message` 提取 `PrincipalDTO`、`ContentDTO`、`MessageRefDTO`。
 - 解析命令：`message.text` 以 `/` 开头时设 `is_command=True`、`command_name`、`command_args`。
-- 解析回复：`message.reply_to_message` 非空时设 `reply_to`。
+- 解析回复：`message.reply_to_message` 非空时设 `reply_ref`。
 - 解析提及：检测 `message.entities` 中的 `mention` / `text_mention`。
 
 ### 5.7 验证

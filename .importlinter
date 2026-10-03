@@ -41,6 +41,6 @@ forbidden_modules =
 name = core internal layers
 type = layers
 layers =
-    core.ports
+    core.contracts
     core.dto
     core.domain

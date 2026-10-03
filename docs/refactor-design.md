@@ -76,7 +76,7 @@
 
 **P2 · handler 签名绑死平台三元组**
 
-全部 handler 签名形如 `(message: Message, bot: Bot, state: FSMContext)`，内部直接 `message.answer/reply/answer_document/answer_photo`、`Command(...)`、`StateFilter(...)`。`_identity.py:41-50` 的 `_make_mention` 拼 `tg://user?id=` 深链，正是目标 2.3 要改成 QQ reply 的点。
+全部 handler 签名形如 `(message: Message, bot: Bot, state: FSMContext)`，内部直接 `message.answer/reply/answer_document/answer_photo`、`Command(...)`、`StateFilter(...)`。`_identity.py:41-50` 的 `_make_mention` 拼 `tg://user?id=` 深链，正是目标 2.3 要改成 `send_message` 的 `mention` 与 `reply_ref` 正交标志的点。
 
 ## 二、目标架构
 
@@ -127,7 +127,7 @@ src/
 │   │   ├── _content.py          ContentDTO / ContentKind
 │   │   ├── _session.py          SessionDTO / MessageDTO
 │   │   ├── _task.py             TaskDTO / TaskRequestDTO / TaskPatchDTO
-│   │   └── _interaction.py      OutboundText / MenuSpecDTO / MenuActionDTO
+│   │   └── _interaction.py      OutboundContentDTO / MenuSpecDTO / MenuActionDTO
 │   ├── domain/                  值对象与枚举
 │   │   ├── __init__.py
 │   │   ├── _platform.py         Platform / ChatScope
@@ -314,6 +314,7 @@ class ContentKind:
     AUDIO: ClassVar[str] = "audio"
     VOICE: ClassVar[str] = "voice"
     ANIMATION: ClassVar[str] = "animation"
+    VIDEO: ClassVar[str] = "video"
     UNKNOWN: ClassVar[str] = "unknown"
 
 
@@ -368,7 +369,7 @@ class InboundEventDTO:
     is_command: bool = False
     command_name: str = ""
     command_args: tuple[str, ...] = ()
-    reply_to: MessageRefDTO | None = None
+    reply_ref: MessageRefDTO | None = None
     is_mention_bot: bool = False
     created_at: float = 0.0
     display_name: str = ""
@@ -389,6 +390,46 @@ class CallbackEventDTO:
 ```
 
 `CallbackEventDTO` 是目标 2.3 与 2.4 的汇合点：TG 的 `callback_query` 和 QQ 的"引用菜单消息回复序号"最终都归一成这个 DTO，业务层写一份 `handle_callback` 即可。
+
+```python
+# src/core/dto/_interaction.py
+
+@dataclass(frozen=True, slots=True)
+class OutboundContentDTO:
+    """外发内容负载
+
+    - kind 分派文字与媒体两种形态
+    - local_path 指本机已落盘文件，仅媒体种类使用
+    - file_name 缺省由 Adapter 取 local_path 末段
+    - 回复关系由发送方法的 reply_ref 参数表达，不进载荷
+    """
+
+    kind: ContentKind
+    text: str = ""  # 负载文字时为正文，媒体时为附言
+    local_path: str = ""  # 仅媒体种类使用
+    file_name: str = ""  # 对外展示文件名，缺省取 local_path 末段
+
+
+@dataclass(frozen=True, slots=True)
+class MenuActionDTO:
+    """菜单单个按钮"""
+
+    action_id: str
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class MenuSpecDTO:
+    """内联菜单规格
+
+    - title 为状态行而非动作按钮
+    """
+
+    title: str
+    rows: tuple[tuple[MenuActionDTO, ...], ...] = ()
+```
+
+`file_token` 属入站方向的平台侧标识，不进外发载荷；外发只认本机路径。菜单的 QQ 降级渲染见 4.5。
 
 ### 3.3 会话与任务 DTO
 
@@ -536,20 +577,26 @@ class InteractionPort(ABC):
     """
 
     @abstractmethod
-    async def send_text(self, principal: PrincipalDTO, text: str) -> MessageRefDTO | None:
-        """发送文本"""
-
-    @abstractmethod
-    async def reply_to_message(
-        self, target: MessageRefDTO, text: str
+    async def send_message(
+        self,
+        principal: PrincipalDTO,
+        content: OutboundContentDTO,
+        reply_ref: MessageRefDTO | None = None,
+        mention: bool = False,
     ) -> MessageRefDTO | None:
-        """回复指定消息"""
+        """发送单条消息
+
+        - kind 分派平台端点，预览家族超平台限制时降级为原样发送
+        - reply_ref 与 mention 是正交标志，TG 引用加深链前缀、QQ 拼引用段与 at 段
+        - 私聊点名由 Adapter 忽略 at 段，退化为普通送达
+        """
 
     @abstractmethod
     async def edit_message(self, target: MessageRefDTO, text: str) -> bool:
         """编辑已发消息
 
         - 不支持或失败返回 False，调用方决定降级
+        - 媒体不可编辑，编辑面只有文本
         """
 
     @abstractmethod
@@ -557,29 +604,10 @@ class InteractionPort(ABC):
         """删除消息"""
 
     @abstractmethod
-    async def send_media(
-        self, principal: PrincipalDTO, payload: OutboundMedia
-    ) -> MessageRefDTO | None:
-        """发送图片文档等媒体"""
+    async def probe_existence(self, target: MessageRefDTO) -> bool:
+        """探测消息是否仍存在
 
-    @abstractmethod
-    async def send_inline_menu(
-        self, principal: PrincipalDTO, spec: MenuSpecDTO
-    ) -> MessageRefDTO | None:
-        """发送内联菜单
-
-        - 无能力时由 Adapter 降级为引用回复命令
-        """
-
-    @abstractmethod
-    async def direct_to_user(
-        self, principal: PrincipalDTO, target: MessageRefDTO | None, text: str
-    ) -> MessageRefDTO | None:
-        """定向投递给某用户
-
-        - TG 用 markdown 深链提及，正文自带可点击用户名
-        - QQ 用引用回复，靠 target 指向该用户的消息
-        - target 为 None 时退化为普通发送
+        - 取代现有 is_deleted 的 dummy 编辑探测
         """
 
     @abstractmethod
@@ -587,41 +615,28 @@ class InteractionPort(ABC):
         """生成提及文本片段
 
         - TG 返回 markdown 深链，可嵌进长文本
-        - QQ 返回纯用户名，因引用是发送方式、无法内嵌
+        - QQ 返回纯用户名，真点名靠 at 消息段、字符串表达不了高亮
         - 同步方法，纯字符串拼装不发请求
         """
 
     @abstractmethod
-    async def begin_status(
-        self, principal: PrincipalDTO, text: str, spec: MenuSpecDTO | None = None
-    ) -> MessageRefDTO | None:
-        """发起状态占位消息
-
-        - 可编辑平台发出占位并返回 ref，供后续原地改写为结果
-        - 不可编辑平台不发占位，直接返回 None
-        - 调用方据返回值决定收尾走编辑还是新发
-        """
-
-    @abstractmethod
-    async def finish_status(
-        self, ref: MessageRefDTO | None, principal: PrincipalDTO, text: str,
+    async def send_status(
+        self,
+        principal: PrincipalDTO,
+        reply_ref: MessageRefDTO,
+        text: str,
         spec: MenuSpecDTO | None = None,
     ) -> MessageRefDTO | None:
-        """收尾状态消息
+        """发送状态占位消息
 
-        - ref 非空则编辑该消息，为空则新发一条
-        - 返回最终消息的 ref
-        """
-
-    @abstractmethod
-    async def probe_exists(self, target: MessageRefDTO) -> bool:
-        """探测消息是否仍存在
-
-        - 取代现有 is_deleted 的 dummy 编辑探测
+        - 两端均发，引用 reply_ref 指向的原消息，不点名
+        - spec 非空：TG 占位挂内联键盘，QQ 占位文本降级为可操作提示
+        - 返回占位 ref，后续状态推进由 TaskScheduler 统管
+        - 终态删除占位后经 send_message 新发结果，结果消息不带键盘
         """
 ```
 
-`begin_status` / `finish_status` 这对方法把两端唯一的行为差异（发不发占位）封装在 Adapter 内部：TG 版 `begin_status` 发占位返回 ref、`finish_status` 编辑它；QQ 版 `begin_status` 直接返回 `None`、`finish_status` 走新发。业务层写一份代码，不判断能力位、不关心平台。
+`send_status` 与 `send_message` 合起来把状态消息生命周期定成两端同构：占位一律发出并引用原消息（不点名），终态一律删除占位再新发结果（引用加点名）。残余差异只剩占位能否原地刷新中间态——TG 用 `edit_message` 刷新（排队到思考），QQ 无编辑能力、中间态保持原文不动，由 `EDIT_MESSAGE` 能力位覆盖。业务层写一份代码，不判断能力位、不关心平台。终态新发的 reply 目标（原消息或刚删除的占位）为待定项 D15。
 
 ```python
 # src/core/ports/_adapter.py
@@ -903,7 +918,10 @@ class HandlerContext:
     principal: PrincipalDTO
 
     async def reply(self, text: str) -> MessageRefDTO | None:
-        """回复当前事件"""
+        """回复当前事件
+
+        - 内部走 send_message，TEXT 载荷加 reply_ref=event.ref
+        """
 
     async def answer(self, text: str) -> MessageRefDTO | None:
         """主动发送到当前会话"""
@@ -911,7 +929,7 @@ class HandlerContext:
     async def direct_to(self, user_id: str, text: str) -> MessageRefDTO | None:
         """定向投递给某用户
 
-        - TG 正文内嵌提及深链，QQ 走引用回复
+        - 内部走 send_message，TEXT 载荷加 mention=True
         """
 
     def mention_fragment(self, user_id: str) -> str:
@@ -919,12 +937,6 @@ class HandlerContext:
 
         - 同步方法，用于拼长文本
         - QQ 返回纯用户名
-        """
-
-    async def send_menu(self, spec: MenuSpecDTO) -> MessageRefDTO | None:
-        """发送交互菜单
-
-        - 无能力时自动走降级通路
         """
 ```
 
@@ -1069,18 +1081,18 @@ class AdapterCapability:
     FSM_NATIVE: ClassVar[int] = 1 << 7         # 平台自带多步状态
 ```
 
-不设 draft 能力位：展示流式已整体砍除（4.6 节），`sendMessageDraft` 不再被任何路径调用。两端思考态的唯一差异是"发不发占位消息"，已由 `EDIT_MESSAGE` 单个能力位覆盖。
+不设 draft 能力位：展示流式已整体砍除（4.6 节），`sendMessageDraft` 不再被任何路径调用。两端思考态的唯一差异是占位能否原地刷新中间态，已由 `EDIT_MESSAGE` 单个能力位覆盖。
 
 申报值：
 
 | 能力 | Telegram | OneBot / QQ | 说明 |
 | :--- | :--- | :--- | :--- |
-| `INLINE_MENU` | ✓ | ✗ | QQ 降级为编号文本 + 引用回复 |
+| `INLINE_MENU` | ✓ | ✗ | 键盘只挂状态占位，QQ 降级为占位内可操作提示 |
 | `CALLBACK_QUERY` | ✓ | ✗ | QQ 由引用回复反查映射还原 |
-| `EDIT_MESSAGE` | ✓ | ✗ | 决定 `begin_status` 发不发占位，见 4.6.3 |
+| `EDIT_MESSAGE` | ✓ | ✗ | 决定状态占位能否原地刷新中间态，见 4.6.3 |
 | `DELETE_MESSAGE` | ✓ | ✓ | QQ 撤回受群权限与 2 分钟时限限制 |
-| `MENTION_LINK` | ✓ | ✗ | QQ 改引用回复，文本片段退化为纯用户名 |
-| `REPLY_QUOTE` | ✓ | ✓ | QQ 降级交互与提及的共同依赖 |
+| `MENTION_LINK` | ✓ | ✗ | QQ 点名走 at 段，深链仅文本内嵌场景退化 |
+| `REPLY_QUOTE` | ✓ | ✓ | QQ 降级交互的依赖 |
 | `SEND_DOCUMENT` | ✓ | 部分 | QQ 走文件上传或转长图 |
 | `FSM_NATIVE` | ✓ | ✗ | QQ 多步状态一律落库 |
 
@@ -1090,26 +1102,24 @@ class AdapterCapability:
 
 | 意图 | 有能力 | 无能力时的降级 |
 | :--- | :--- | :--- |
-| `send_inline_menu` | 渲染内联键盘 | 发编号文本 + 提示"引用本消息回复序号"，`action_id ↔ 序号` 映射存 DB |
+| `send_status(spec)` | TG 占位挂内联键盘 | QQ 占位文本渲染可操作提示，`action_id ↔ 命令` 映射存 DB |
 | `handle_callback` | `callback_query` 直投 | 收到引用回复时反查映射表，还原成 `CallbackEventDTO` |
-| `direct_to_user` | 正文内嵌 `tg://user?id=` 深链 | **改用引用回复**（`reply` 定位到该用户消息）；无 `target` 时退化为普通发送 |
-| `mention_fragment` | markdown 深链，可嵌长文本 | 纯用户名，因引用是发送方式、无法内嵌 |
-| `begin_status` | 发「正在思考中」占位并返回 ref | **不发占位**，返回 `None`，避免发了又必须撤回 |
-| `finish_status` | 把占位原地编辑为最终回答 | ref 为 `None`，直接新发一条最终回答 |
-| `edit_message` | 直接编辑 | 撤回后重发，`degraded` 置真，返回新的 `MessageRefDTO`。QQ 侧因不发占位而极少触发 |
-| `send_document` | 原生文件 | 转图片长图或分片文本 |
+| `send_message(mention=True)` | TG 正文或附言前置 `tg://user?id=` 深链 | QQ 加 at 段，私聊无 at 语义时退化为普通送达；部分实现离线成员高亮受限 |
+| `mention_fragment` | markdown 深链，可嵌长文本 | 纯用户名，at 是消息段无法嵌进文本 |
+| `send_status` | 发「正在思考中」占位引用原消息返回 ref，中间态 `edit_message` 原地刷新 | 占位同样发出并引用原消息，无编辑能力则中间态不刷新；终态删占位后新发，与 TG 同构 |
+| `edit_message` | 直接编辑 | 撤回后重发，`degraded` 置真，返回新的 `MessageRefDTO`。QQ 侧占位中间态不刷新，故极少触发 |
 
-提及之所以拆成 `direct_to_user` 与 `mention_fragment` 两个方法：TG 的提及是**文本片段**（深链可嵌进任意长文本），QQ 的提及是**发送方式**（靠引用某条消息），二者形态不同，硬塞进一个返回字符串的方法里表达不了。拆开后 TG 走片段、QQ 走投递，`_identity.py:41-50` 的 `_make_mention` 深链拼装移入 TG Adapter，业务层只声明"要说给这个人听"。
+引用与点名不设独立投递方法：OneBot v11 消息段规范中 at 段与 reply 段各自独立、可同条共存，点名不必借道引用，故 `send_message` 用 `reply_ref` 与 `mention` 两个正交标志表达，`direct_to_user` 退役。`mention_fragment` 独立保留：TG 深链是可嵌进长文本的片段，QQ 的 at 是消息段无法内嵌，片段形态差异仍在。`_identity.py:41-50` 的 `_make_mention` 深链拼装移入 TG Adapter，业务层只声明引用谁、点名谁。
 
 QQ 端引用回复的应答识别流程：
 
 ```
-send_inline_menu(spec)
-  → 发文本「1. 查看历史  2. 清除记忆  3. 导出图片」
-  → 写 menu_action 表：(message_id, "1") → action_id="history.export"
+send_status(spec=菜单)
+  → QQ 降级发文本「正在思考… 可回复：1 停止」
+  → 写 menu_action 表：(message_id, "1") → action_id
 用户引用该消息回复「1」
-  → normalize 时 reply_to 命中 menu_action 表
-  → 产出 CallbackEventDTO(action_id="history.export")
+  → normalize 时 reply_ref 命中 menu_action 表
+  → 产出 CallbackEventDTO(action_id)
   → 与 TG 按键回调走完全相同的下游处理
 ```
 
@@ -1153,25 +1163,27 @@ send_inline_menu(spec)
 
 #### 4.6.3 两端最终形态
 
-TG 端——占位消息原地编辑为结果，全程 1 条消息、1 次编辑、0 次撤回：
+TG 端——占位引用原消息，完成时删占位后引用加 at 新发结果：
 
 ```
 用户提问
-  → send_message 发「🧠 正在思考中」，挂内联键盘 [停止生成]
-  → 静默等待，期间不动这条消息
-  → 完成：editMessageText 改写为最终回答 + 完整键盘
-       [导出图片] [清除记忆] [查看历史] [重新生成]
+  → send_status 发「🧠 正在思考中」引用原消息（不 at），挂 [停止生成]
+  → 等待期中间态经 edit_message 原地刷新（排队到思考），失败则跳过
+  → 完成：delete_message 删占位，键盘随之消失
+  → send_message 最终回答 + 引用原消息 + mention，不带键盘，后续操作靠命令
 ```
 
-QQ 端——不发占位，直接出结果，全程 1 条消息、0 次编辑、0 次撤回：
+QQ 端——流程同构，仅中间态不刷新：
 
 ```
 用户提问
-  → 静默等待
-  → 完成：send_msg 发最终回答 + 编号菜单（引用回复序号交互）
+  → send_status 发占位引用原消息（不 at），spec 降级为占位内可操作提示
+  → 等待期无编辑能力，占位保持原文不动
+  → 完成：delete_msg 删占位
+  → send_msg 最终回答 + 引用段 + at 段，不带菜单
 ```
 
-两端唯一差异是**要不要发占位消息**：TG 能把占位编辑成结果、不多占一条消息，QQ 不能编辑、发占位就必须撤回，不如不发。这一处差异由 `EDIT_MESSAGE` 单个能力位覆盖，不需要 draft、节流、分档等任何额外机制。
+占位与终态的收发骨架两端一致，残余差异只剩占位能否原地刷新中间态，由 `EDIT_MESSAGE` 单个能力位覆盖。终态新发的 reply 目标指向原消息还是刚删除的占位，为待定项 D15：指向已删消息时 QQ 端引用会显示失效，TG 端静默丢引用，实测前按指向原消息实现。draft、节流、分档等机制仍不需要。
 
 内联键盘两端都不受影响：键盘挂的是最终那条持久消息，与思考态展示本就是两件事。draft 是临时预览气泡、不可挂 `reply_markup`，这正是当初它无法与键盘共存的原因——现在 draft 整体退役，该矛盾自然消失。
 
@@ -1194,8 +1206,8 @@ QQ 端——不发占位，直接出结果，全程 1 条消息、0 次编辑、
 | :--- | :--- | :--- |
 | `stream_chat` 及其 yield | `core/_client.py:31`、`base_client.py:70` | 见 4.6.2 |
 | `_handle_ai_message` 流式循环 | `_worker.py:92` | 承载取消能力与内容累加 |
-| 状态消息占位 | `_ai_chat.py:61` 的 `safe_reply(preview)` | TG 端继续用，QQ 端跳过 |
-| `safe_edit` | `_tasks.py:77` | TG 端把占位改写为结果 |
+| 状态消息占位 | `_ai_chat.py:61` 的 `safe_reply(preview)` | 两端均发，QQ 端中间态不刷新 |
+| `safe_edit` | `_tasks.py:77` | TG 端刷新占位中间态，终态不走编辑 |
 | 分段发送 | `_worker.py:38` 的 `_send_long_message` | 不依赖编辑能力，两端通用 |
 
 `_handle_ai_message` 的事件类型从四类减为三类：`think` 分支删除，保留 `chunk`（累加正文）、`final`（收尾）、`error`（异常）。`worker_loop` 的 `match` 相应去掉 `case "think"`。
@@ -1282,10 +1294,10 @@ class TaskPriority:
 | `status_id` | `TaskDTO.status_ref: MessageRefDTO` |
 | `draft_id` / `last_draft_time` | **删除**，展示流式已砍除（4.6） |
 | `bot: Bot` | 删除，Adapter 私有 |
-| `is_deleted()` | `InteractionPort.probe_exists()` |
+| `is_deleted()` | `InteractionPort.probe_existence()` |
 | `safe_delete()` | `InteractionPort.delete_message()` |
-| `safe_reply()` | `InteractionPort.reply_to_message()`，占位场景走 `begin_status()` |
-| `safe_edit()` | `InteractionPort.edit_message()`，收尾走 `finish_status()`，降级逻辑移入 Adapter |
+| `safe_reply()` | `InteractionPort.send_message(reply_ref=...)`，点名加 mention，占位场景走 `send_status()` |
+| `safe_edit()` | `InteractionPort.edit_message()`，终态走删除占位加 `send_message` 重发，降级逻辑移入 Adapter |
 | `safe_draft()` | **删除**，不设替代端口 |
 
 原方法里的 `TelegramAPIError` 字符串匹配（`_tasks.py:42,70-72,90,96`）全部下沉到 Telegram Adapter 内部，翻译为领域异常 `MessageVanishedError` / `TaskAbortedError`。业务层再也见不到平台异常类型。
@@ -1711,9 +1723,14 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 | D5 | `bot/` 目录 | **保留 `bot/`，不改名** | 原建议改名 `runtime/`，但 `packaging/launcher.py:50` 的 `_PRESERVE_NAMES` 已含 `runtime`——那是发布包根目录的嵌入式 Python 存放处（`runtime\python.exe`，见 `docs/packaging.md:14`）。两处同名虽不产生文件冲突（一个在包根、一个在 `src/` 下），但排查问题时极易混淆，且改名还要动 `build.py:204`、`launcher.py:595`、`development.md:12` 三处硬编码。收益纯语义、代价是新增混淆源，不值得。若日后仍要改，用 `app/` 或 `bootstrap/` 避开 `runtime` |
 | D6 | 多步状态存储 | **统一 DB 实现** | 桥接 aiogram FSM 改动最小，但保留"重启丢状态"既有缺陷且两端行为不一致；DB 实现让 GUI 面板可查询卡在第几步的用户 |
 | D7 | 迁移激进程度 | **新旧并存，插件逐个迁** | 每阶段可独立运行与回滚，加载器兼容旧 `router` 契约；一次切换出问题定位面大 |
-| D8 | 思考过程展示 | **整体砍除**，两端静默等待后输出最终回答，draft 机制退役 | 用户 2026-10-01 决定。砍除后两端行为差异收敛为一处（发不发占位消息），由 `EDIT_MESSAGE` 单个能力位覆盖，不再需要 draft、节流、分档等机制。删除清单见 4.6.4 |
+| D8 | 思考过程展示 | **整体砍除**，两端静默等待后输出最终回答，draft 机制退役 | 用户 2026-10-01 决定。砍除后两端行为差异收敛为占位能否原地刷新中间态，由 `EDIT_MESSAGE` 单个能力位覆盖，不再需要 draft、节流、分档等机制。占位与终态流程见 D15 与 4.6.3，删除清单见 4.6.4 |
 | D9 | 传输流式（SSE） | **保留**，`stream_chat` 两端共用不改 | 与界面无关，是程序与 AI 服务商之间的 HTTP 行为。保留理由三条：`read` 超时语义（流式下不会误杀长回答）、取消能力依赖 `async for` 提前 break、记录仍需 `reasoning_content`。详见 4.6.2 |
 | D10 | `reasoning_content` 去向 | **砍展示、留记录** | 用户 2026-10-02 定案：思考过程随消息持久化（`MessageDTO` 加 `reasoning` 字段、`session_message` 表加列），`/history` 导出内容不变，另提供按消息查看思考过程的命令；`history_for_model` 转换时丢弃，不喂模型 |
+| D11 | 会话级 md_ready | **删除**，渲染触发下沉消息级 | 产物按消息 ref 建索引，命中直返、未中现渲，会话布尔无消费者 |
+| D12 | `TaskDTO.status_ref` | **保留** | 跨重启持久，恢复时清理僵尸占位的唯一把手，TG 降级重发也需改写 |
+| D13 | DTO 命名 | **一律 DTO 后缀** | `core/dto` 类型统一后缀，不设裸名例外 |
+| D14 | 发送面 | **`send_message` 单入口** | `OutboundContentDTO` 按 kind 分派文字与媒体，reply 与 mention 为 `send_message` 正交标志，不设独立回复或投递方法；OneBot v11 的 at 段与 reply 段独立，旧前提"QQ 提及只能靠引用"作废 |
+| D15 | 状态消息流程 | **占位两端均发并引用原消息（不 at）；终态删占位后新发：引用加 at 加完整键盘** | 用户 2026-10-03 约定。待定：终态 reply 指向原消息还是刚删的占位——指向已删消息两端表现待实测，定前按原消息实现 |
 
 ## 七、分步实施路线
 
@@ -1753,7 +1770,7 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 **阶段 5 · InteractionPort + Telegram Adapter**
 
-建 `adapters/base/` 与 `adapters/telegram/`。把 `TelegramTaskItem` 的四个 `safe_*` 方法拆进 `_interaction.py`（`safe_draft` 直接删除，见 4.6.4），新增 `begin_status` / `finish_status` 封装占位差异，平台异常字符串匹配下沉翻译成领域异常。`HandlerContext` 上线，handler 签名从 `(message, bot, state)` 改为 `(event, ctx)`。
+建 `adapters/base/` 与 `adapters/telegram/`。把 `TelegramTaskItem` 的四个 `safe_*` 方法拆进 `_interaction.py`（`safe_draft` 直接删除，见 4.6.4），新增 `send_status` 落地占位引用与终态删重发流程，`send_message` 并入 mention 与 reply 正交标志，平台异常字符串匹配下沉翻译成领域异常。`HandlerContext` 上线，handler 签名从 `(message, bot, state)` 改为 `(event, ctx)`。
 
 验证：TG 端全功能回归——私聊对话、群聊触发词、占位消息编辑为最终回答、长消息分段、频控退避、原消息删除中断。确认 draft 相关代码已清除且不影响回答输出。
 
@@ -1787,9 +1804,9 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 **阶段 10 · OneBot Adapter**
 
-实现 `_api.py`（HTTP + 正向 WS）、`_normalize.py`、`_interaction.py`（含菜单降级、`begin_status` 返回 `None` 不发占位）、`_state.py`、`_engine.py`。建 `menu_action` 映射逻辑。
+实现 `_api.py`（HTTP + 正向 WS）、`_normalize.py`、`_interaction.py`（含占位可操作提示降级、引用段与 at 段拼装、`send_status` 同样发占位、终态删占位重发）、`_state.py`、`_engine.py`。建 `menu_action` 映射逻辑。
 
-验证：QQ 端私聊与群聊对话跑通；内联菜单降级为编号文本后，引用回复序号能正确还原 `CallbackEventDTO`；提及降级为引用回复（`reply` 定位到该用户消息）；等待期间 QQ 端不产生任何消息、零撤回、零编辑；日志前缀显示 `[QQ]`。
+验证：QQ 端私聊与群聊对话跑通；占位键盘降级为可操作提示后，引用回复序号能正确还原 `CallbackEventDTO`；提及走 at 段；等待期间占位保持原文不动、终态删占位后新发；日志前缀显示 `[QQ]`。
 
 **阶段 11 · 媒体索引接线**
 
@@ -1839,14 +1856,14 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 | :--- | :--- | :--- |
 | **DTO** | 只装数据、不带行为、跨层传递用的"纯数据盒子"，只读不可改 | 现有 `TaskItem`（`models.py:15`）就是半个 DTO，但它塞了 `Message` 活体对象，不纯。改造后 `TaskDTO` 只装 `task_id`、状态、时间等纯值 |
 | **Repository（仓储）** | 专门管一类数据的增删改查，把"数据存哪、怎么存"藏起来，外面只调方法 | 现有 `_blacklist.py` 的 `get_black_list` / `save_black_list` 就是雏形，只是它存 txt。改造后 `BlacklistRepository` 存 SQLite，接口不变 |
-| **Port（端口）** | 只定义"能做什么"的抽象方法，不含"怎么做"，具体实现由别处提供 | `InteractionPort.send_text(...)` 只声明"要能发文本"，TG 版用 aiogram 实现，QQ 版用 OneBot 实现，业务层调同一个方法 |
+| **Port（端口）** | 只定义"能做什么"的抽象方法，不含"怎么做"，具体实现由别处提供 | `InteractionPort.send_message(...)` 只声明"要能发一条消息"，TG 版用 aiogram 实现，QQ 版用 OneBot 实现，业务层调同一个方法 |
 | **Adapter（适配器）** | 把某个具体平台的 API 翻译成 Port 要求的样子 | `TelegramAdapter` 把 aiogram 包成 Port；`OneBotAdapter` 把 OneBot 包成同一个 Port |
 | **UnitOfWork（工作单元）** | 把多个数据库操作打包成一个事务，要么全成要么全滚 | 清理会话要同时删 4 张表，现有 `_monitor.py:119` 的 unlink 三连没有事务，删一半失败就留孤儿文件。UnitOfWork 解决这个 |
 | **WAL** | SQLite 的一种日志模式，让"读"和"写"不打架，读写可并发 | 默认模式下写库时读库会被阻塞；开 WAL 后 GUI 面板查队列和后台写任务能同时进行。一行 `PRAGMA journal_mode=WAL` 开启 |
 | **落盘 / 入库** | 落盘=写成文件存硬盘；入库=写进数据库 | 对话记录（txt/md/png）是"落盘"；会话、任务、黑名单改造后是"入库" |
 | **Principal（主体）** | 唯一标识"哪个平台的哪个会话里的哪个用户" | 现有 `get_name` 产出 `u_123`，缺平台维度。`PrincipalDTO` 补全为 `telegram:private:123:123`，QQ 用户就不会和 TG 用户撞号 |
 | **能力协商** | 运行时先问"这平台支持 X 吗"，不支持就走降级 | `supports(EDIT_MESSAGE)` 在 QQ 返回 False，思考态就自动改走"撤回重发"而非"原地编辑" |
-| **降级** | 高级能力不可用时，退而求其次用低级能力达到近似效果 | 内联键盘 QQ 不支持，降级成"编号文本 + 引用回复序号" |
+| **降级** | 高级能力不可用时，退而求其次用低级能力达到近似效果 | 占位内联键盘 QQ 不支持，降级成占位内可操作提示 + 引用回复序号 |
 
 ### aiosqlite 与标准库 sqlite3 的区别
 
@@ -1859,7 +1876,7 @@ D1～D7 已按建议定案（用户 2026-10-01 确认"我听你的"）。D8、D9
 
 ## 附二：不在本轮范围
 
-- Telegram 内联键盘的实际实现（只保证 `send_inline_menu` 接口与降级通路可用）。
+- Telegram 内联键盘的实际实现（只保证 `send_status` 的 spec 参数与降级通路可用）。
 - MySQL Repository 实现（只保证接口可承载）。
 - OneBot v11 之外的协议版本（NapCat / Lagrange 等实现差异在 `_api.py` 内部消化）。
 - GUI 面板的队列可视化（`TaskService.snapshot` 已备好数据，界面后续做）。

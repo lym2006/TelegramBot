@@ -17,6 +17,8 @@
 - **规范新增 DTO 后缀与词表归层命名**：`core/dto` 类型一律 `DTO` 后缀，词表按变更范围定归属。
 - **重构方案移除会话级 md_ready**：渲染触发下沉到消息级（TG 按钮 / QQ 命令），产物按消息 ref 建索引；字段、补丁位、端口方法与 DDL 列同步删除。
 - **D10 定案**：思考过程砍展示、留记录，`MessageDTO` 与 `session_message` 表加 `reasoning` 字段，配套按消息查看命令。
+- **端口发送面收口**：统一为 `send_message` + `OutboundContentDTO` 载荷（kind 分派、预览超限降级归 Adapter、reply_ref 与 mention 正交标志），键盘与可操作提示只挂状态占位、`send_inline_menu` 并入 `send_status`，删除独立回复与定向投递方法；新增 `MenuSpecDTO`/`MenuActionDTO` 与 `ContentKind.VIDEO`。
+- **状态消息流程重定**：占位两端均发并引用原消息（不点名），终态统一删占位后引用加点名新发（终态 reply 目标待定，见 D15）；OneBot at 段与 reply 段独立，旧前提“QQ 提及只能靠引用”作废。
 
 ---
 
