@@ -15,7 +15,6 @@ class TaskKind(StrEnum):
     HISTORY = "history"
     CLEAR = "clear"
     MD = "md"
-    THINK = "think"
     SYSTEM = "system"
 
 
@@ -36,5 +35,5 @@ class TaskPriority(IntEnum):
     """
 
     IMMEDIATE = 0  # 控制类命令：清队、停止、切换
-    HIGH = 10  # 查询类：history、md、think
+    HIGH = 10  # 查询类：history、md
     NORMAL = 50  # 普通对话

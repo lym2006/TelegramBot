@@ -22,10 +22,7 @@ class TaskDTO:
     priority: TaskPriority
 
     source_ref: MessageRefDTO | None = None
-    status_ref: MessageRefDTO | None = None
-
     payload: tuple[tuple[str, str], ...] = ()
-
     created_at: float = 0.0
     started_at: float | None = None
     finished_at: float | None = None
@@ -59,7 +56,5 @@ class TaskPatchDTO:
 
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
-
-    status_ref: MessageRefDTO | None = None
     error_text: str | None = None
     finished_at: float | None = None

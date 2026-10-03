@@ -16,7 +16,6 @@ class MessageDTO:
 
     role: ChatRole
     content: str
-    reasoning: str = ""  # 思考过程，仅 assistant 消息有值，喂模型时丢弃
     created_at: float = 0.0
 
 

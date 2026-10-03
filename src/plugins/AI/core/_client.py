@@ -42,6 +42,7 @@ class AIClient(BaseClient):
             "messages": msg,
             "stream": True,
             "temperature": ai_config.temperature,
+            **dict(ai_config.think_mode),
         }
 
         async for line in super().stream_post(
@@ -49,7 +50,7 @@ class AIClient(BaseClient):
             request_path=ai_config.request_path,
             headers=cls._headers(),
             payload=payload,
-            timeout=ai_config.timeout,  # 用户配置的网络超时（global.network_timeout）
+            timeout=ai_config.timeout,
         ):
             if line.startswith("data: "):
                 try:

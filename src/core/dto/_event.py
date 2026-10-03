@@ -39,7 +39,7 @@ class CallbackEventDTO:
 
     ref: MessageRefDTO
     principal: PrincipalDTO
-    action_id: str
+    action: str  # 操作名
 
     source_ref: MessageRefDTO | None = None
     payload: tuple[tuple[str, str], ...] = ()

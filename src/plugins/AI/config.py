@@ -22,16 +22,19 @@ class _StaticAIConfig:
     - 存放固定不变的值
     """
 
-    record_dir: Path = RECORDS_DIR  # 路径配置
+    # 路径配置
+    record_dir: Path = RECORDS_DIR
     black_dir: Path = BLACKLIST_DIR
+
+    # 硬编码模型行为
+    model_name: str = "deepseek-ai/DeepSeek-V4-Flash"
+    think_mode: tuple[tuple[str, Any], ...] = (("enable_thinking", False),)
 
     # API 与模型基础配置
     base_url: str = "https://api.siliconflow.cn/v1"
     request_path: str = "/chat/completions"
     msg_chunk_size: int = 4000  # 消息发送相关
     flood_threshold: int = 5
-    think_throttle_sec: float = 1.2
-    trim_preview_len: int = 2000
 
 
 _HOUR_SECONDS = 60 * 60
@@ -50,7 +53,6 @@ class _DynamicAIConfig:
         # 定义动态属性的获取规则：属性名 -> (配置中心路径, 类型)
         self._dynamic_attr_map = {
             "timeout": ("global.network_timeout", float),
-            "model_name": ("ai.model_name", str),
             "api_key": ("ai.api_key", str),
             "temperature": ("ai.temperature", float),
             "group_triggers": ("chore.triggers", list),

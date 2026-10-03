@@ -27,10 +27,6 @@ network_timeout = 90.0
 
 [ai]
 
-# 模型名称
-# 从 Siliconflow 的模型广场获取，例如: Pro/deepseek-ai/DeepSeek-R1
-model_name = "Pro/deepseek-ai/DeepSeek-R1"
-
 # API Key
 # 在 Siliconflow 自行创建并填入
 api_key = "sk-xxxxxxxxxxxx"

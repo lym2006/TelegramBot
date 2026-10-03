@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from ._base import BotError
 
 if TYPE_CHECKING:
-    from core.dto import MessageRef
+    from core.dto import MessageRefDTO
 
 
 class DomainError(BotError):
@@ -22,7 +22,7 @@ class MessageVanishedError(DomainError):
     - 被撤回或删除
     """
 
-    def __init__(self, ref: "MessageRef") -> None:
+    def __init__(self, ref: "MessageRefDTO") -> None:
         self.platform = ref.platform
         self.message_id = ref.message_id
         super().__init__()
